@@ -1,0 +1,10 @@
+[package]
+name = "mailsync"
+version = "0.1.0"
+authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
+
+[dependencies]
+serde = "*"
+serde_derive = "*"
+tokio-imap = { path = "../tokio-imap" }
+toml = "*"
