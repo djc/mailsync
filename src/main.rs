@@ -21,5 +21,6 @@ fn main() {
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
     let config: Config = toml::from_str(&s).unwrap();
-    tokio_imap::run(&config.server, &config.account, &config.password);
+    let client = tokio_imap::Client::connect(&config.server);
+    client.login(&config.account, &config.password);
 }
