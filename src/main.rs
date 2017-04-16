@@ -29,8 +29,10 @@ fn main() {
     let handle = core.handle();
     let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|client| {
         println!("connected: {}", client.server_greeting());
-        client.login(&config.account, &config.password);
-        ok(())
+        client.login(&config.account, &config.password).and_then(|_| {
+            println!("logged in as {}", &config.account);
+            ok(())
+        })
     });
     core.run(res).unwrap();
 }
