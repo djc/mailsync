@@ -1,12 +1,16 @@
+extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
+extern crate tokio_core;
 extern crate tokio_imap;
 
+use futures::future::{Future, ok};
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::str;
+use tokio_core::reactor::Core;
 
 #[derive(Deserialize)]
 struct Config {
@@ -21,6 +25,12 @@ fn main() {
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
     let config: Config = toml::from_str(&s).unwrap();
-    let client = tokio_imap::Client::connect(&config.server);
-    client.login(&config.account, &config.password);
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+    let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|client| {
+        println!("connected: {}", client.server_greeting());
+        client.login(&config.account, &config.password);
+        ok(())
+    });
+    core.run(res).unwrap();
 }

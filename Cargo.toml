@@ -8,3 +8,5 @@ serde = "*"
 serde_derive = "*"
 tokio-imap = { path = "../tokio-imap" }
 toml = "*"
+tokio-core = "*"
+futures = "*"
