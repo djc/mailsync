@@ -27,8 +27,8 @@ fn main() {
     let config: Config = toml::from_str(&s).unwrap();
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|client| {
-        println!("server: {}", client.server_greeting());
+    let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|(client, server_greeting)| {
+        println!("server: {:?}", server_greeting);
         client.login(&config.account, &config.password).and_then(|_| {
             println!("logged in as {}", &config.account);
             ok(())
