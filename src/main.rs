@@ -11,6 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
+use tokio_imap::proto::{MessageData, SequenceSet};
 
 #[derive(Deserialize)]
 struct Config {
@@ -35,7 +36,14 @@ fn main() {
             }
             ok(client)
         }).and_then(|client| {
-            client.select("Inbox").and_then(|(_, responses)| {
+            client.select("Inbox").and_then(|(client, responses)| {
+                for rsp in responses.frames {
+                    println!("server: {:?}", rsp);
+                }
+                ok(client)
+            })
+        }).and_then(|client| {
+            client.fetch(SequenceSet::Range(1, 15), MessageData::All).and_then(|(_, responses)| {
                 for rsp in responses.frames {
                     println!("server: {:?}", rsp);
                 }
