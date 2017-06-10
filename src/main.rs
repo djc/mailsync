@@ -33,6 +33,8 @@ fn main() {
             for rsp in responses.frames {
                 println!("server: {:?}", rsp);
             }
+            ok(client)
+        }).and_then(|client| {
             client.select("Inbox").and_then(|(_, responses)| {
                 for rsp in responses.frames {
                     println!("server: {:?}", rsp);
