@@ -31,20 +31,20 @@ fn main() {
     let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|(client, server_greeting)| {
         println!("server: {:?}", server_greeting);
         client.login(&config.account, &config.password).and_then(|(client, responses)| {
-            for rsp in responses.frames {
+            for rsp in responses.iter() {
                 println!("server: {:?}", rsp);
             }
             ok(client)
         }).and_then(|client| {
             client.select("Inbox").and_then(|(client, responses)| {
-                for rsp in responses.frames {
+                for rsp in responses.iter() {
                     println!("server: {:?}", rsp);
                 }
                 ok(client)
             })
         }).and_then(|client| {
             client.fetch(SequenceSet::Range(1, 15), MessageData::All).and_then(|(_, responses)| {
-                for rsp in responses.frames {
+                for rsp in responses.iter() {
                     println!("server: {:?}", rsp);
                 }
                 ok(())
