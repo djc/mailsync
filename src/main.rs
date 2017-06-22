@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
-use tokio_imap::proto::{MessageData, SequenceSet};
+use tokio_imap::proto::{AttrMacro, CommandBuilder};
 
 #[derive(Deserialize)]
 struct Config {
@@ -30,20 +30,28 @@ fn main() {
     let handle = core.handle();
     let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|(client, server_greeting)| {
         println!("server: {:?}", server_greeting);
-        client.login(&config.account, &config.password).and_then(|(client, responses)| {
+        let cmd = CommandBuilder::login(&config.account, &config.password);
+        client.call(cmd).and_then(|(client, responses)| {
             for rsp in responses.iter() {
                 println!("server: {:?}", rsp);
             }
             ok(client)
         }).and_then(|client| {
-            client.select("Inbox").and_then(|(client, responses)| {
+            let cmd = CommandBuilder::select("Inbox");
+            client.call(cmd).and_then(|(client, responses)| {
                 for rsp in responses.iter() {
                     println!("server: {:?}", rsp);
                 }
                 ok(client)
             })
         }).and_then(|client| {
-            client.fetch(SequenceSet::Range(1, 15), MessageData::All).and_then(|(_, responses)| {
+            let cmd = CommandBuilder::fetch()
+                .all_after(1)
+                .attr_macro(AttrMacro::Fast)
+                .unwrap()
+                .changed_since(29248804)
+                .build();
+            client.call(cmd).and_then(|(_, responses)| {
                 for rsp in responses.iter() {
                     println!("server: {:?}", rsp);
                 }
