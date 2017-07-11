@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
-use tokio_imap::proto::{AttrMacro, CommandBuilder};
+use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderModifiers};
 
 #[derive(Deserialize)]
 struct Config {
@@ -47,7 +47,7 @@ fn main() {
         }).and_then(|client| {
             let cmd = CommandBuilder::fetch()
                 .all_after(1)
-                .attr_macro(AttrMacro::Fast)
+                .attr(Attribute::Envelope)
                 .unwrap()
                 .changed_since(29248804)
                 .build();
