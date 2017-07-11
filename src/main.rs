@@ -29,7 +29,7 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|(client, server_greeting)| {
-        println!("server: {:?}", server_greeting);
+        println!("server: {:?}", server_greeting.parsed());
         let cmd = CommandBuilder::login(&config.account, &config.password);
         client.call(cmd).and_then(|(client, responses)| {
             for rsp in responses.iter() {
