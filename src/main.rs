@@ -26,6 +26,28 @@ fn show_responses(responses: tokio_imap::client::ServerMessages) {
     }
 }
 
+type ClientFuture = Future<Item = tokio_imap::Client, Error = std::io::Error>;
+
+fn check_folder(client: tokio_imap::Client, name: &str) -> Box<ClientFuture> {
+    Box::new(client.call(CommandBuilder::select(name))
+        .and_then(|(client, responses)| {
+             show_responses(responses);
+             ok(client)
+        }).and_then(|client| {
+            let cmd = CommandBuilder::fetch()
+                .all_after(1)
+                .attr(Attribute::Envelope)
+                .unwrap()
+                .changed_since(29248804)
+                .build();
+            client.call(cmd).and_then(|(client, responses)| {
+                show_responses(responses);
+                ok(client)
+            })
+        })
+    )
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut f = File::open(&args[1]).unwrap();
@@ -40,24 +62,8 @@ fn main() {
         client.call(cmd).and_then(|(client, responses)| {
             show_responses(responses);
             ok(client)
-        }).and_then(|client| {
-            let cmd = CommandBuilder::select("Inbox");
-            client.call(cmd).and_then(|(client, responses)| {
-                show_responses(responses);
-                ok(client)
-            })
-        }).and_then(|client| {
-            let cmd = CommandBuilder::fetch()
-                .all_after(1)
-                .attr(Attribute::Envelope)
-                .unwrap()
-                .changed_since(29248804)
-                .build();
-            client.call(cmd).and_then(|(_, responses)| {
-                show_responses(responses);
-                ok(())
-            })
-        })
+        }).and_then(|client| check_folder(client, "Inbox")
+        ).and_then(|_| ok(()))
     });
     core.run(res).unwrap();
 }
