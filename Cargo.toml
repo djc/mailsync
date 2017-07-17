@@ -7,6 +7,6 @@ authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 futures = "*"
 serde = "*"
 serde_derive = "*"
+tokio-core = "*"
 tokio-imap = { path = "../tokio-imap" }
 toml = "*"
-tokio-core = "*"
