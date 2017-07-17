@@ -20,6 +20,12 @@ struct Config {
     password: String,
 }
 
+fn show_responses(responses: tokio_imap::client::ServerMessages) {
+    for rsp in responses.iter() {
+        println!("server: {:?}", rsp);
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut f = File::open(&args[1]).unwrap();
@@ -29,19 +35,15 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|(client, server_greeting)| {
-        println!("server: {:?}", server_greeting.parsed());
+        println!("greeting: {:?}", server_greeting.parsed());
         let cmd = CommandBuilder::login(&config.account, &config.password);
         client.call(cmd).and_then(|(client, responses)| {
-            for rsp in responses.iter() {
-                println!("server: {:?}", rsp);
-            }
+            show_responses(responses);
             ok(client)
         }).and_then(|client| {
             let cmd = CommandBuilder::select("Inbox");
             client.call(cmd).and_then(|(client, responses)| {
-                for rsp in responses.iter() {
-                    println!("server: {:?}", rsp);
-                }
+                show_responses(responses);
                 ok(client)
             })
         }).and_then(|client| {
@@ -52,9 +54,7 @@ fn main() {
                 .changed_since(29248804)
                 .build();
             client.call(cmd).and_then(|(_, responses)| {
-                for rsp in responses.iter() {
-                    println!("server: {:?}", rsp);
-                }
+                show_responses(responses);
                 ok(())
             })
         })
