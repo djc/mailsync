@@ -15,6 +15,11 @@ use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderModifiers};
 
 #[derive(Deserialize)]
 struct Config {
+    imap: ImapConfig,
+}
+
+#[derive(Deserialize)]
+struct ImapConfig {
     server: String,
     account: String,
     password: String,
@@ -56,9 +61,9 @@ fn main() {
     let config: Config = toml::from_str(&s).unwrap();
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let res = tokio_imap::Client::connect(&config.server, &handle).and_then(|(client, server_greeting)| {
+    let res = tokio_imap::Client::connect(&config.imap.server, &handle).and_then(|(client, server_greeting)| {
         println!("greeting: {:?}", server_greeting.parsed());
-        let cmd = CommandBuilder::login(&config.account, &config.password);
+        let cmd = CommandBuilder::login(&config.imap.account, &config.imap.password);
         client.call(cmd).and_then(|(client, responses)| {
             show_responses(responses);
             ok(client)
