@@ -38,7 +38,8 @@ fn check_folder(client: tokio_imap::Client, name: &str) -> Box<ClientFuture> {
         .and_then(|(client, responses)| {
              show_responses(responses);
              ok(client)
-        }).and_then(|client| {
+        })
+        .and_then(|client| {
             let cmd = CommandBuilder::fetch()
                 .all_after(1)
                 .attr(Attribute::Envelope)
@@ -58,16 +59,21 @@ fn main() {
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
     let config: Config = toml::from_str(&s).unwrap();
+
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let res = tokio_imap::Client::connect(&config.imap.server, &handle).and_then(|(client, server_greeting)| {
-        println!("greeting: {:?}", server_greeting.parsed());
-        let cmd = CommandBuilder::login(&config.imap.account, &config.imap.password);
-        client.call(cmd).and_then(|(client, responses)| {
-            show_responses(responses);
-            ok(client)
-        }).and_then(|client| check_folder(client, "Inbox")
-        ).and_then(|_| ok(()))
-    });
-    core.run(res).unwrap();
+    core.run(tokio_imap::Client::connect(&config.imap.server, &handle)
+        .and_then(|(client, server_greeting)| {
+            println!("greeting: {:?}", server_greeting.parsed());
+            let cmd = CommandBuilder::login(
+                &config.imap.account, &config.imap.password);
+            client.call(cmd)
+                .and_then(|(client, responses)| {
+                    show_responses(responses);
+                    ok(client)
+                })
+                .and_then(|client| check_folder(client, "Inbox"))
+                .and_then(|_| ok(()))
+        })
+    ).unwrap();
 }
