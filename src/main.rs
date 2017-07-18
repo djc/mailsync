@@ -25,28 +25,20 @@ struct ImapConfig {
     password: String,
 }
 
-fn show_responses(responses: tokio_imap::client::ServerMessages) {
-    for rsp in responses.iter() {
-        println!("server: {:?}", rsp);
-    }
-}
-
 type ClientFuture = Future<Item = tokio_imap::Client, Error = std::io::Error>;
 
 fn check_folder(client: tokio_imap::Client, name: &str) -> Box<ClientFuture> {
     Box::new(client.call(CommandBuilder::select(name))
-        .and_then(|(client, responses)| {
-             show_responses(responses);
-             ok(client)
-        })
-        .and_then(|client| {
+        .and_then(|(client, _)| {
             let cmd = CommandBuilder::fetch()
                 .all_after(1)
                 .attr(Attribute::Envelope)
                 .changed_since(29248804)
                 .build();
             client.call(cmd).and_then(|(client, responses)| {
-                show_responses(responses);
+                for rsp in responses.iter() {
+                    println!("server: {:?}", &rsp);
+                }
                 ok(client)
             })
         })
@@ -63,16 +55,11 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     core.run(tokio_imap::Client::connect(&config.imap.server, &handle)
-        .and_then(|(client, server_greeting)| {
-            println!("greeting: {:?}", server_greeting.parsed());
+        .and_then(|(client, _)| {
             let cmd = CommandBuilder::login(
                 &config.imap.account, &config.imap.password);
             client.call(cmd)
-                .and_then(|(client, responses)| {
-                    show_responses(responses);
-                    ok(client)
-                })
-                .and_then(|client| check_folder(client, "Inbox"))
+                .and_then(|(client, _)| check_folder(client, "Inbox"))
                 .and_then(|_| ok(()))
         })
     ).unwrap();
