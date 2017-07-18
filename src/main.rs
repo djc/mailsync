@@ -1,4 +1,5 @@
 extern crate futures;
+extern crate futures_state_stream;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
@@ -7,6 +8,8 @@ extern crate tokio_imap;
 extern crate tokio_postgres;
 
 use futures::future::{Future, ok};
+use futures::stream::{self, Stream};
+use futures_state_stream::StateStream;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};
@@ -40,9 +43,9 @@ struct Context {
 
 type ContextFuture = Future<Item = Context, Error = std::io::Error>;
 
-fn check_folder(ctx: Context, name: &str) -> Box<ContextFuture> {
+fn check_folder(ctx: Context, label: Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
-    Box::new(client.call(CommandBuilder::select(name))
+    Box::new(client.call(CommandBuilder::select(&label.name))
         .and_then(|(client, _)| {
             let cmd = CommandBuilder::fetch()
                 .all_after(1)
@@ -59,8 +62,30 @@ fn check_folder(ctx: Context, name: &str) -> Box<ContextFuture> {
     )
 }
 
-fn sync_folders(ctx: Context) -> Box<Future<Item = (), Error = io::Error>> {
-    Box::new(check_folder(ctx, "Inbox").and_then(|_| ok(())))
+struct Label {
+    id: i32,
+    name: String,
+    mod_seq: i64,
+}
+
+fn sync_folders(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
+    let Context { client, conn } = ctx;
+    Box::new(conn.prepare("SELECT id, name, mod_seq FROM labels")
+        .and_then(|(stmt, conn)| {
+            conn.query(&stmt, &[]).map(|row| {
+                Ok(Label {
+                    id: row.get(0),
+                    name: row.get(1),
+                    mod_seq: row.get(2),
+                })
+            }).collect()
+        })
+        .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
+        .and_then(|(labels, conn)| {
+            let ctx = Context { client, conn };
+            stream::iter(labels).fold(ctx, |ctx, label| check_folder(ctx, label))
+        })
+        .and_then(|ctx| ok(ctx)))
 }
 
 fn main() {

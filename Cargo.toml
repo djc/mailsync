@@ -5,6 +5,7 @@ authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 
 [dependencies]
 futures = "*"
+futures-state-stream = "*"
 serde = "*"
 serde_derive = "*"
 tokio-core = "*"
