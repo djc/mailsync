@@ -105,6 +105,6 @@ fn main() {
                 Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
                     .map_err(|e| io::Error::new(io::ErrorKind::Other, e))))
             .and_then(|((client, _), conn)|
-                sync_folders(Context { client, conn: conn }))
+                sync_folders(Context { client, conn }))
     ).unwrap();
 }
