@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
-use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderModifiers};
+use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderMessages, FetchBuilderAttributes, FetchBuilderModifiers};
 
 #[derive(Deserialize)]
 struct Config {
@@ -42,7 +42,6 @@ fn check_folder(client: tokio_imap::Client, name: &str) -> Box<ClientFuture> {
             let cmd = CommandBuilder::fetch()
                 .all_after(1)
                 .attr(Attribute::Envelope)
-                .unwrap()
                 .changed_since(29248804)
                 .build();
             client.call(cmd).and_then(|(client, responses)| {
