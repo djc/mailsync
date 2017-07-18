@@ -4,6 +4,7 @@ extern crate serde_derive;
 extern crate toml;
 extern crate tokio_core;
 extern crate tokio_imap;
+extern crate tokio_postgres;
 
 use futures::future::{Future, ok};
 use std::env;
@@ -12,10 +13,12 @@ use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
 use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderMessages, FetchBuilderAttributes, FetchBuilderModifiers};
+use tokio_postgres::{Connection, TlsMode};
 
 #[derive(Deserialize)]
 struct Config {
     imap: ImapConfig,
+    store: StoreConfig,
 }
 
 #[derive(Deserialize)]
@@ -25,9 +28,15 @@ struct ImapConfig {
     password: String,
 }
 
+#[derive(Deserialize)]
+struct StoreConfig {
+    uri: String,
+}
+
 type ClientFuture = Future<Item = tokio_imap::Client, Error = std::io::Error>;
 
-fn check_folder(client: tokio_imap::Client, name: &str) -> Box<ClientFuture> {
+fn check_folder(client: tokio_imap::Client, conn: Connection, name: &str)
+                -> Box<ClientFuture> {
     Box::new(client.call(CommandBuilder::select(name))
         .and_then(|(client, _)| {
             let cmd = CommandBuilder::fetch()
@@ -54,13 +63,17 @@ fn main() {
 
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    core.run(tokio_imap::Client::connect(&config.imap.server, &handle)
-        .and_then(|(client, _)| {
-            let cmd = CommandBuilder::login(
-                &config.imap.account, &config.imap.password);
-            client.call(cmd)
-                .and_then(|(client, _)| check_folder(client, "Inbox"))
-                .and_then(|_| ok(()))
-        })
+    core.run(Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
+        .then(|conn|
+            tokio_imap::Client::connect(&config.imap.server, &handle)
+                .and_then(|(client, _)| {
+                    let cmd = CommandBuilder::login(
+                        &config.imap.account, &config.imap.password);
+                    client.call(cmd)
+                        .and_then(|(client, _)|
+                            check_folder(client, conn.expect("database connection failed"), "Inbox"))
+                        .and_then(|_| ok(()))
+                })
+        )
     ).unwrap();
 }

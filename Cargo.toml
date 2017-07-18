@@ -9,4 +9,5 @@ serde = "*"
 serde_derive = "*"
 tokio-core = "*"
 tokio-imap = { path = "../tokio-imap" }
+tokio-postgres = "*"
 toml = "*"
