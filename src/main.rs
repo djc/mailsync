@@ -83,9 +83,9 @@ fn sync_folders(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> 
         .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
         .and_then(|(labels, conn)| {
             let ctx = Context { client, conn };
-            stream::iter(labels).fold(ctx, |ctx, label| check_folder(ctx, label))
+            stream::iter(labels).fold(ctx, check_folder)
         })
-        .and_then(|ctx| ok(ctx)))
+        .and_then(ok))
 }
 
 fn main() {
