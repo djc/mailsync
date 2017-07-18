@@ -9,7 +9,7 @@ extern crate tokio_postgres;
 use futures::future::{Future, ok};
 use std::env;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::str;
 use tokio_core::reactor::Core;
 use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderMessages, FetchBuilderAttributes, FetchBuilderModifiers};
@@ -33,10 +33,15 @@ struct StoreConfig {
     uri: String,
 }
 
-type ClientFuture = Future<Item = tokio_imap::Client, Error = std::io::Error>;
+struct Context {
+    client: tokio_imap::Client,
+    conn: Connection,
+}
 
-fn check_folder(client: tokio_imap::Client, conn: Connection, name: &str)
-                -> Box<ClientFuture> {
+type ContextFuture = Future<Item = Context, Error = std::io::Error>;
+
+fn check_folder(ctx: Context, name: &str) -> Box<ContextFuture> {
+    let Context { client, conn } = ctx;
     Box::new(client.call(CommandBuilder::select(name))
         .and_then(|(client, _)| {
             let cmd = CommandBuilder::fetch()
@@ -48,10 +53,14 @@ fn check_folder(client: tokio_imap::Client, conn: Connection, name: &str)
                 for rsp in responses.iter() {
                     println!("server: {:?}", &rsp);
                 }
-                ok(client)
+                ok(Context { client, conn })
             })
         })
     )
+}
+
+fn sync_folders(ctx: Context) -> Box<Future<Item = (), Error = io::Error>> {
+    Box::new(check_folder(ctx, "Inbox").and_then(|_| ok(())))
 }
 
 fn main() {
@@ -63,17 +72,14 @@ fn main() {
 
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    core.run(Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
-        .then(|conn|
-            tokio_imap::Client::connect(&config.imap.server, &handle)
-                .and_then(|(client, _)| {
-                    let cmd = CommandBuilder::login(
-                        &config.imap.account, &config.imap.password);
-                    client.call(cmd)
-                        .and_then(|(client, _)|
-                            check_folder(client, conn.expect("database connection failed"), "Inbox"))
-                        .and_then(|_| ok(()))
-                })
-        )
+    core.run(
+        tokio_imap::Client::connect(&config.imap.server, &handle)
+            .and_then(|(client, _)| client.call(CommandBuilder::login(
+                &config.imap.account, &config.imap.password))
+            .join(
+                Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))))
+            .and_then(|((client, _), conn)|
+                sync_folders(Context { client, conn: conn }))
     ).unwrap();
 }
