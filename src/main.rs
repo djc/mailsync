@@ -46,19 +46,18 @@ type ContextFuture = Future<Item = Context, Error = std::io::Error>;
 fn check_folder(ctx: Context, label: Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(client.call(CommandBuilder::select(&label.name))
-        .and_then(|(client, _)| {
+        .collect()
+        .and_then(|(_, client)| {
             let cmd = CommandBuilder::fetch()
                 .all_after(1)
                 .attr(Attribute::Envelope)
                 .changed_since(29248804)
                 .build();
-            client.call(cmd).and_then(|(client, responses)| {
-                for rsp in responses.iter() {
-                    println!("server: {:?}", &rsp);
-                }
-                ok(Context { client, conn })
+            client.call(cmd).for_each(|rd| {
+                println!("server: {:?}", &rd.parsed());
+                Ok(())
             })
-        })
+        }).and_then(|client| ok(Context { client, conn }))
     )
 }
 
@@ -99,12 +98,14 @@ fn main() {
     let handle = core.handle();
     core.run(
         tokio_imap::Client::connect(&config.imap.server, &handle)
-            .and_then(|(client, _)| client.call(CommandBuilder::login(
-                &config.imap.account, &config.imap.password))
+            .and_then(|(client, _)|
+                client.call(CommandBuilder::login(
+                    &config.imap.account, &config.imap.password))
+                .collect())
             .join(
                 Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))))
-            .and_then(|((client, _), conn)|
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)))
+            .and_then(|((_, client), conn)|
                 sync_folders(Context { client, conn }))
     ).unwrap();
 }
