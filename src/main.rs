@@ -15,7 +15,8 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::str;
 use tokio_core::reactor::Core;
-use tokio_imap::proto::{Attribute, CommandBuilder, FetchBuilderMessages, FetchBuilderAttributes, FetchBuilderModifiers};
+use tokio_imap::proto::Attribute;
+use tokio_imap::client::builder::*;
 use tokio_postgres::{Connection, TlsMode};
 
 #[derive(Deserialize)]
