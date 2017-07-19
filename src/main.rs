@@ -46,19 +46,21 @@ type ContextFuture = Future<Item = Context, Error = std::io::Error>;
 
 fn check_folder(ctx: Context, label: Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
-    Box::new(client.call(CommandBuilder::select(&label.name))
-        .collect()
-        .and_then(|(_, client)| {
-            let cmd = CommandBuilder::fetch()
-                .all_after(1)
-                .attr(Attribute::Envelope)
-                .changed_since(29248804)
-                .build();
-            client.call(cmd).for_each(|rd| {
-                println!("server: {:?}", &rd.parsed());
-                Ok(())
+    Box::new(
+        client.call(CommandBuilder::select(&label.name))
+            .collect()
+            .and_then(|(_, client)| {
+                let cmd = CommandBuilder::fetch()
+                    .all_after(1)
+                    .attr(Attribute::Envelope)
+                    .changed_since(29248804)
+                    .build();
+                client.call(cmd).for_each(|rd| {
+                    println!("server: {:?}", &rd.parsed());
+                    Ok(())
+                })
             })
-        }).and_then(|client| ok(Context { client, conn }))
+            .and_then(|client| ok(Context { client, conn })),
     )
 }
 
@@ -70,20 +72,25 @@ struct Label {
 
 fn sync_folders(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
     let Context { client, conn } = ctx;
-    Box::new(conn.prepare("SELECT id, name, mod_seq FROM labels")
-        .and_then(|(stmt, conn)| {
-            conn.query(&stmt, &[]).map(|row| {
-                Ok(Label {
-                    id: row.get(0),
-                    name: row.get(1),
-                    mod_seq: row.get(2),
-                })
-            }).collect()
-        })
-        .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
-        .and_then(|(labels, conn)|
-            stream::iter(labels).fold(Context { client, conn }, check_folder))
-        .and_then(ok))
+    Box::new(
+        conn.prepare("SELECT id, name, mod_seq FROM labels")
+            .and_then(|(stmt, conn)| {
+                conn.query(&stmt, &[])
+                    .map(|row| {
+                        Ok(Label {
+                            id: row.get(0),
+                            name: row.get(1),
+                            mod_seq: row.get(2),
+                        })
+                    })
+                    .collect()
+            })
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
+            .and_then(|(labels, conn)| {
+                stream::iter(labels).fold(Context { client, conn }, check_folder)
+            })
+            .and_then(ok),
+    )
 }
 
 fn main() {
@@ -97,14 +104,18 @@ fn main() {
     let handle = core.handle();
     core.run(
         tokio_imap::Client::connect(&config.imap.server, &handle)
-            .and_then(|(client, _)|
-                client.call(CommandBuilder::login(
-                    &config.imap.account, &config.imap.password))
-                .collect())
+            .and_then(|(client, _)| {
+                client
+                    .call(CommandBuilder::login(
+                        &config.imap.account,
+                        &config.imap.password,
+                    ))
+                    .collect()
+            })
             .join(
                 Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)))
-            .and_then(|((_, client), conn)|
-                sync_folders(Context { client, conn }))
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
+            )
+            .and_then(|((_, client), conn)| sync_folders(Context { client, conn })),
     ).unwrap();
 }
