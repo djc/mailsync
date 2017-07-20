@@ -44,7 +44,7 @@ struct Context {
 
 type ContextFuture = Future<Item = Context, Error = std::io::Error>;
 
-fn check_folder(ctx: Context, label: Label) -> Box<ContextFuture> {
+fn sync_label(ctx: Context, label: Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(
         client.call(CommandBuilder::select(&label.name))
@@ -70,7 +70,7 @@ struct Label {
     mod_seq: i64,
 }
 
-fn sync_folders(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
+fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
     let Context { client, conn } = ctx;
     Box::new(
         conn.prepare("SELECT id, name, mod_seq FROM labels")
@@ -87,7 +87,7 @@ fn sync_folders(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> 
             })
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
             .and_then(|(labels, conn)| {
-                stream::iter(labels).fold(Context { client, conn }, check_folder)
+                stream::iter(labels).fold(Context { client, conn }, sync_label)
             })
             .and_then(ok),
     )
@@ -116,6 +116,6 @@ fn main() {
                 Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
                     .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
             )
-            .and_then(|((_, client), conn)| sync_folders(Context { client, conn })),
+            .and_then(|((_, client), conn)| check_labels(Context { client, conn })),
     ).unwrap();
 }
