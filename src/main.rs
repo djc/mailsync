@@ -60,7 +60,8 @@ fn sync_label(ctx: Context, label: Label) -> Box<ContextFuture> {
                     Ok(())
                 })
             })
-            .and_then(|client| ok(Context { client, conn })),
+            .and_then(|client| client.call(CommandBuilder::close()).collect())
+            .and_then(|(_, client)| ok(Context { client, conn }))
     )
 }
 
