@@ -44,7 +44,11 @@ struct Context {
 
 type ContextFuture = Future<Item = Context, Error = std::io::Error>;
 
-fn sync_label(ctx: Context, label: Label) -> Box<ContextFuture> {
+fn load_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
+    Box::new(ok(ctx))
+}
+
+fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(
         client.call(CommandBuilder::select(&label.name))
@@ -89,7 +93,16 @@ fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> 
             })
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
             .and_then(|(labels, conn)| {
-                stream::iter(labels).fold(Context { client, conn }, sync_label)
+                stream::iter(labels).fold(Context { client, conn }, |ctx, label| {
+                    if label.mod_seq.is_some() {
+                        println!("start sync for label {} (from {:?})",
+                            &label.name, &label.mod_seq);
+                        sync_label(ctx, &label)
+                    } else {
+                        println!("load messages for label {}", &label.name);
+                        load_label(ctx, &label)
+                    }
+                })
             })
             .and_then(ok),
     )
