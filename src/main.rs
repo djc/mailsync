@@ -19,61 +19,31 @@ use tokio_imap::proto::Attribute;
 use tokio_imap::client::builder::*;
 use tokio_postgres::{Connection, TlsMode};
 
-#[derive(Deserialize)]
-struct Config {
-    imap: ImapConfig,
-    store: StoreConfig,
-}
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let mut f = File::open(&args[1]).unwrap();
+    let mut s = String::new();
+    f.read_to_string(&mut s).unwrap();
+    let config: Config = toml::from_str(&s).unwrap();
 
-#[derive(Deserialize)]
-struct ImapConfig {
-    server: String,
-    account: String,
-    password: String,
-}
-
-#[derive(Deserialize)]
-struct StoreConfig {
-    uri: String,
-}
-
-struct Context {
-    client: tokio_imap::Client,
-    conn: Connection,
-}
-
-type ContextFuture = Future<Item = Context, Error = std::io::Error>;
-
-fn load_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
-    Box::new(ok(ctx))
-}
-
-fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
-    let Context { client, conn } = ctx;
-    Box::new(
-        client.call(CommandBuilder::select(&label.name))
-            .collect()
-            .and_then(|(_, client)| {
-                let cmd = CommandBuilder::fetch()
-                    .all_after(1)
-                    .attr(Attribute::Envelope)
-                    .changed_since(29248804)
-                    .build();
-                client.call(cmd).for_each(|rd| {
-                    println!("server: {:?}", &rd.parsed());
-                    Ok(())
-                })
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+    core.run(
+        tokio_imap::Client::connect(&config.imap.server, &handle)
+            .and_then(|(client, _)| {
+                client
+                    .call(CommandBuilder::login(
+                        &config.imap.account,
+                        &config.imap.password,
+                    ))
+                    .collect()
             })
-            .and_then(|client| client.call(CommandBuilder::close()).collect())
-            .and_then(|(_, client)| ok(Context { client, conn }))
-    )
-}
-
-#[derive(Debug)]
-struct Label {
-    id: i32,
-    name: String,
-    mod_seq: Option<i64>,
+            .join(
+                Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
+            )
+            .and_then(|((_, client), conn)| check_labels(Context { client, conn })),
+    ).unwrap();
 }
 
 fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
@@ -108,29 +78,59 @@ fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> 
     )
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let mut f = File::open(&args[1]).unwrap();
-    let mut s = String::new();
-    f.read_to_string(&mut s).unwrap();
-    let config: Config = toml::from_str(&s).unwrap();
-
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    core.run(
-        tokio_imap::Client::connect(&config.imap.server, &handle)
-            .and_then(|(client, _)| {
-                client
-                    .call(CommandBuilder::login(
-                        &config.imap.account,
-                        &config.imap.password,
-                    ))
-                    .collect()
+fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
+    let Context { client, conn } = ctx;
+    Box::new(
+        client.call(CommandBuilder::select(&label.name))
+            .collect()
+            .and_then(|(_, client)| {
+                let cmd = CommandBuilder::fetch()
+                    .all_after(1)
+                    .attr(Attribute::Envelope)
+                    .changed_since(29248804)
+                    .build();
+                client.call(cmd).for_each(|rd| {
+                    println!("server: {:?}", &rd.parsed());
+                    Ok(())
+                })
             })
-            .join(
-                Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
-            )
-            .and_then(|((_, client), conn)| check_labels(Context { client, conn })),
-    ).unwrap();
+            .and_then(|client| client.call(CommandBuilder::close()).collect())
+            .and_then(|(_, client)| ok(Context { client, conn }))
+    )
+}
+
+fn load_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
+    Box::new(ok(ctx))
+}
+
+#[derive(Deserialize)]
+struct Config {
+    imap: ImapConfig,
+    store: StoreConfig,
+}
+
+#[derive(Deserialize)]
+struct ImapConfig {
+    server: String,
+    account: String,
+    password: String,
+}
+
+#[derive(Deserialize)]
+struct StoreConfig {
+    uri: String,
+}
+
+type ContextFuture = Future<Item = Context, Error = std::io::Error>;
+
+struct Context {
+    client: tokio_imap::Client,
+    conn: Connection,
+}
+
+#[derive(Debug)]
+struct Label {
+    id: i32,
+    name: String,
+    mod_seq: Option<i64>,
 }
