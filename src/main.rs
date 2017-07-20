@@ -65,6 +65,7 @@ fn sync_label(ctx: Context, label: Label) -> Box<ContextFuture> {
     )
 }
 
+#[derive(Debug)]
 struct Label {
     id: i32,
     name: String,
