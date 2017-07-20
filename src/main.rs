@@ -68,7 +68,7 @@ fn sync_label(ctx: Context, label: Label) -> Box<ContextFuture> {
 struct Label {
     id: i32,
     name: String,
-    mod_seq: i64,
+    mod_seq: Option<i64>,
 }
 
 fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
