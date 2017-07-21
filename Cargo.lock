@@ -147,10 +147,15 @@ dependencies = [
 [[package]]
 name = "futures-state-stream"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "futures-state-stream"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+replace = "futures-state-stream 0.1.1"
 
 [[package]]
 name = "gcc"

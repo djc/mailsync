@@ -12,3 +12,6 @@ tokio-core = "*"
 tokio-imap = { path = "../tokio-imap" }
 tokio-postgres = "*"
 toml = "*"
+
+[replace]
+"futures-state-stream:0.1.1" = { path = "../futures-state-stream" }
