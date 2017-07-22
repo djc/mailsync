@@ -30,6 +30,7 @@ fn main() {
     let handle = core.handle();
     core.run(
         tokio_imap::Client::connect(&config.imap.server, &handle)
+            .map_err(|e| SyncError::from(e))
             .and_then(|(client, _)| {
                 client
                     .call(CommandBuilder::login(
@@ -37,16 +38,17 @@ fn main() {
                         &config.imap.password,
                     ))
                     .collect()
+                    .map_err(|e| SyncError::from(e))
             })
             .join(
                 Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e)),
+                    .map_err(|e| SyncError::from(e))
             )
             .and_then(|((_, client), conn)| check_labels(Context { client, conn })),
     ).unwrap();
 }
 
-fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> {
+fn check_labels(ctx: Context) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(
         conn.prepare("SELECT id, name, mod_seq FROM labels")
@@ -61,7 +63,7 @@ fn check_labels(ctx: Context) -> Box<Future<Item = Context, Error = io::Error>> 
                     })
                     .collect()
             })
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "database error"))
+            .map_err(|e| SyncError::from(e))
             .and_then(|(labels, conn)| {
                 stream::iter(labels).fold(Context { client, conn }, |ctx, label| {
                     if label.mod_seq.is_some() {
@@ -96,6 +98,7 @@ fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
             })
             .and_then(|client| client.call(CommandBuilder::close()).collect())
             .and_then(|(_, client)| ok(Context { client, conn }))
+            .map_err(|e| SyncError::from(e))
     )
 }
 
@@ -121,7 +124,7 @@ struct StoreConfig {
     uri: String,
 }
 
-type ContextFuture = Future<Item = Context, Error = std::io::Error>;
+type ContextFuture = Future<Item = Context, Error = SyncError>;
 
 struct Context {
     client: tokio_imap::Client,
@@ -134,3 +137,29 @@ struct Label {
     name: String,
     mod_seq: Option<i64>,
 }
+
+macro_rules! error_enum_impls {
+    ($name:ident, $( $variant:ident : $ty:path ),+ ) => {
+        $(impl From<$ty> for $name {
+            fn from(e: $ty) -> Self {
+                $name:: $variant (e)
+            }
+        })*
+    };
+}
+
+macro_rules! error_enum {
+    ($name:ident, $( $variant:ident : $ty:path ),+ $(,)* ) => {
+        #[derive(Debug)]
+        enum $name {
+            $($variant($ty)),*
+        }
+        error_enum_impls!($name, $($variant : $ty),*);
+    };
+}
+
+error_enum!(SyncError,
+    Io: io::Error,
+    Pg: tokio_postgres::error::Error,
+    PgConnect: tokio_postgres::error::ConnectError,
+);
