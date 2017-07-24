@@ -84,7 +84,7 @@ fn check_labels(ctx: Context) -> Box<ContextFuture> {
 fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(
-        client.call(CommandBuilder::select(&label.name))
+        client.call(CommandBuilder::examine(&label.name))
             .collect()
             .and_then(|(_, client)| {
                 let cmd = CommandBuilder::fetch()
@@ -106,7 +106,7 @@ fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
 fn load_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(
-        client.call(CommandBuilder::select(&label.name))
+        client.call(CommandBuilder::examine(&label.name))
             .collect()
             .map_err(|e| SyncError::from(e))
             .and_then(|(label_meta, client)| {
