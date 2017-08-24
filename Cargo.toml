@@ -4,8 +4,12 @@ version = "0.1.0"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 
 [dependencies]
+chrono = "0.4"
+email-parser = { path = "../email-parser" }
 futures = "*"
 futures-state-stream = "*"
+mbox-reader = { path = "../mbox-reader" }
+postgres = { version = "0.15", features = ["with-chrono"] }
 serde = "*"
 serde_derive = "*"
 tokio-core = "*"
