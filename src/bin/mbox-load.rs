@@ -72,7 +72,7 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
 
         let mid_raw = headers.get_first("message-id");
         let message_id = match mid_raw {
-            Some(ref mid) => Some(mid.as_ref()),
+            Some(ref mid) => Some(mid.as_ref().trim()),
             None => None as Option<&str>,
         };
 
