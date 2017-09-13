@@ -1,7 +1,6 @@
 extern crate futures;
 extern crate futures_state_stream;
-#[macro_use]
-extern crate serde_derive;
+extern crate mailsync;
 extern crate toml;
 extern crate tokio_core;
 extern crate tokio_imap;
@@ -13,12 +12,14 @@ use futures_state_stream::StateStream;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
 use tokio_imap::proto::*;
 use tokio_imap::client::builder::*;
 use tokio_postgres::{Connection, TlsMode};
+use mailsync::*;
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -270,61 +271,3 @@ struct MessageMeta {
     date: String,
     raw: ResponseData,
 }
-
-#[derive(Deserialize)]
-struct Config {
-    imap: ImapConfig,
-    store: StoreConfig,
-}
-
-#[derive(Deserialize)]
-struct ImapConfig {
-    server: String,
-    account: String,
-    password: String,
-}
-
-#[derive(Deserialize)]
-struct StoreConfig {
-    uri: String,
-}
-
-type ContextFuture = Future<Item = Context, Error = SyncError>;
-
-struct Context {
-    client: tokio_imap::Client,
-    conn: Connection,
-}
-
-#[derive(Debug)]
-struct Label {
-    id: i32,
-    name: String,
-    mod_seq: Option<i64>,
-}
-
-macro_rules! error_enum_impls {
-    ($name:ident, $( $variant:ident : $ty:path ),+ ) => {
-        $(impl From<$ty> for $name {
-            fn from(e: $ty) -> Self {
-                $name:: $variant (e)
-            }
-        })*
-    };
-}
-
-macro_rules! error_enum {
-    ($name:ident, $( $variant:ident : $ty:path ),+ $(,)* ) => {
-        #[derive(Debug)]
-        enum $name {
-            $($variant($ty)),*
-        }
-        error_enum_impls!($name, $($variant : $ty),*);
-    };
-}
-
-error_enum!(SyncError,
-    Io: io::Error,
-    Pg: tokio_postgres::error::Error,
-    PgConnect: tokio_postgres::error::ConnectError,
-);
