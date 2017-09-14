@@ -3,6 +3,9 @@ extern crate serde_derive;
 extern crate csv;
 extern crate mailsync;
 extern crate postgres;
+extern crate chrono;
+
+use chrono::{DateTime, FixedOffset};
 
 use mailsync::*;
 
@@ -40,14 +43,24 @@ fn read_meta(fname: &str) -> MetaMap {
 fn process(map: MetaMap, conn: Connection) {
     let mut i = 0;
     let stmt = conn.prepare("UPDATE messages SET unid = $1, mod_seq = $2 WHERE id = $3").unwrap();
-    for row in &conn.query("SELECT id, mid FROM messages", &[]).unwrap() {
+    for row in &conn.query("SELECT id, dt, mid FROM messages", &[]).unwrap() {
 
         if i % 10000 == 0 {
             println!("processed {} messages", i);
         }
 
         let id: i32 = row.get(0);
-        let mid: String = row.get(1);
+        let dt: Option<DateTime<FixedOffset>> = row.get(1);
+        let mid: Option<String> = row.get(2);
+        if mid.is_none() {
+            continue;
+        }
+
+        let mid = mid.unwrap();
+        if mid.ends_with("chat@gmail.com>") {
+            continue;
+        }
+
         let metas = match map.get(&mid) {
             Some(m) => m,
             None => {
