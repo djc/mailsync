@@ -64,16 +64,19 @@ fn process(map: MetaMap, conn: Connection) {
         let metas = match map.get(&mid) {
             Some(m) => m,
             None => {
-                println!("mid {} not in map", mid);
+                //println!("mid {} from {:?} not in map", mid, dt);
                 i += 1;
                 continue;
             },
         };
         if metas.len() == 1 {
             let meta = metas.get(0).unwrap();
-            stmt.execute(&[&meta.uid, &(meta.mod_seq as i64), &id]);
+            let res = stmt.execute(&[&(meta.uid as i64), &(meta.mod_seq as i64), &id]);
+            if res.is_err() {
+                println!("result {:?}", res);
+            }
         } else {
-            println!("unexpected value for {}", mid);
+            println!("unexpected value for {} = {}", mid, metas.len());
         }
 
         i += 1;
