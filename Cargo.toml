@@ -9,6 +9,7 @@ csv = "1.0.0-beta.4"
 email-parser = { path = "../email-parser" }
 futures = "*"
 futures-state-stream = "*"
+itertools = "*"
 mbox-reader = { path = "../mbox-reader" }
 postgres = { version = "0.15", features = ["with-chrono"] }
 serde = "*"
