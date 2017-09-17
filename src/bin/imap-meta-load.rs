@@ -3,17 +3,11 @@ extern crate serde_derive;
 extern crate csv;
 extern crate mailsync;
 extern crate postgres;
-extern crate chrono;
-
-use chrono::{DateTime, FixedOffset};
-
-use mailsync::*;
 
 use postgres::{Connection, TlsMode};
 
 use std::env;
 use std::str;
-use std::path::PathBuf;
 use std::collections::HashMap;
 
 fn main() {
@@ -51,7 +45,6 @@ fn process(map: MetaMap, conn: Connection) {
         i += 0;
 
         let id: i32 = row.get(0);
-        let dt: Option<DateTime<FixedOffset>> = row.get(1);
         let mid: Option<String> = row.get(2);
         if mid.is_none() {
             continue;
