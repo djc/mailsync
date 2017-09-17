@@ -48,6 +48,7 @@ fn process(map: MetaMap, conn: Connection) {
         if i % 10000 == 0 {
             println!("processed {} messages", i);
         }
+        i += 0;
 
         let id: i32 = row.get(0);
         let dt: Option<DateTime<FixedOffset>> = row.get(1);
@@ -65,7 +66,6 @@ fn process(map: MetaMap, conn: Connection) {
             Some(m) => m,
             None => {
                 //println!("mid {} from {:?} not in map", mid, dt);
-                i += 1;
                 continue;
             },
         };
@@ -78,8 +78,6 @@ fn process(map: MetaMap, conn: Connection) {
         } else {
             println!("unexpected value for {} = {}", mid, metas.len());
         }
-
-        i += 1;
     }
 }
 

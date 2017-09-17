@@ -30,8 +30,7 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
         if i % 1000 == 0 {
             println!("seen {}", i);
         }
-
-        if i == 251780 || i == 396664 {
+        i += 1;
 
         // Strip GMail-specific "headers"
         let bytes = entry.message().unwrap();
@@ -83,7 +82,7 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
         };
 
         let text = str::from_utf8(&bytes).unwrap();
-        let res = if i == 251780 {
+        let res = if i == 251781 {
             let mut vec = bytes.to_vec();
             vec[6368] = b' ';
             let s = str::from_utf8(&vec).unwrap();
@@ -98,9 +97,6 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
             _ => {},
         }
 
-        }
-
-        i += 1;
     }
     println!("DONE {}", i);
 
