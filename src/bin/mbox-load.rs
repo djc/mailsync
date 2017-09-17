@@ -78,8 +78,8 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
 
         let subject_raw = headers.get_first("subject");
         let subject = match subject_raw {
-            Some(ref subj) => Some(subj.as_ref()),
-            None => None as Option<&str>,
+            Some(ref subj) => Some(subj.as_ref().replace('\x00', "")),
+            None => None as Option<String>,
         };
 
         let text = str::from_utf8(&bytes).unwrap();
@@ -88,9 +88,6 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
             vec[6368] = b' ';
             let s = str::from_utf8(&vec).unwrap();
             stmt.execute(&[&dt, &subject, &message_id, &s])
-        } else if i == 396664 {
-            let no_null = Some(subject.unwrap().replace('\x00', ""));
-            stmt.execute(&[&dt, &no_null, &message_id, &text])
         } else {
             stmt.execute(&[&dt, &subject, &message_id, &text])
         };
