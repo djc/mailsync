@@ -1,3 +1,4 @@
+extern crate email_parser;
 extern crate futures;
 extern crate futures_state_stream;
 extern crate mailsync;
@@ -6,19 +7,23 @@ extern crate tokio_core;
 extern crate tokio_imap;
 extern crate tokio_postgres;
 
+use email_parser::Message;
+
 use futures::future::{Future, ok};
-use futures::stream::{self, Stream};
 use futures_state_stream::StateStream;
-use std::collections::HashMap;
+
+use mailsync::*;
+
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::str;
+
 use tokio_core::reactor::Core;
-use tokio_imap::proto::*;
+
 use tokio_imap::client::builder::*;
+
 use tokio_postgres::{Connection, TlsMode};
-use mailsync::*;
 
 
 fn main() {
@@ -46,228 +51,73 @@ fn main() {
                 Connection::connect(config.store.uri.clone(), TlsMode::None, &handle)
                     .map_err(|e| SyncError::from(e))
             )
-            .and_then(|((_, client), conn)| check_labels(Context { client, conn })),
+            .and_then(|((_, client), conn)| sync_messages(Context { client, conn })),
     ).unwrap();
 }
 
-fn check_labels(ctx: Context) -> Box<ContextFuture> {
+fn sync_messages(ctx: Context) -> Box<ContextFuture> {
     let Context { client, conn } = ctx;
     Box::new(
-        conn.prepare("SELECT id, name, mod_seq FROM labels")
+        conn
+            .prepare("SELECT MAX(unid) FROM messages")
+            .map_err(|e| SyncError::from(e))
             .and_then(|(stmt, conn)| {
                 conn.query(&stmt, &[])
-                    .map(|row| {
-                        Ok(Label {
-                            id: row.get(0),
-                            name: row.get(1),
-                            mod_seq: row.get(2),
-                        })
-                    })
+                    .map_err(|e| SyncError::from(e))
                     .collect()
             })
-            .map_err(|e| SyncError::from(e))
-            .and_then(|(labels, conn)| {
-                stream::iter(labels).fold(Context { client, conn }, |ctx, label| {
-                    if label.mod_seq.is_some() {
-                        println!("start sync for label {} (from {:?})",
-                            &label.name, &label.mod_seq);
-                        sync_label(ctx, &label)
-                    } else {
-                        println!("load messages for label {}", &label.name);
-                        load_label(ctx, &label)
-                    }
-                })
+            .join(
+                client.call(CommandBuilder::examine("[Gmail]/All Mail"))
+                    .collect()
+                    .map_err(|e| SyncError::from(e))
+            )
+            .and_then(|((rows, conn), (_, client))| {
+                let seen_seq: i64 = rows[0].get(0);
+                conn.prepare("INSERT INTO messages (unid, mod_seq, dt, subject, mid, bytes) \
+                              VALUES ($1, $2, $3, $4, $5, $6)")
+                    .map_err(|e| SyncError::from(e))
+                    .and_then(move |(istmt, conn)| ok((seen_seq, istmt, conn, client)))
             })
-            .and_then(ok),
-    )
-}
-
-fn sync_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
-    let Context { client, conn } = ctx;
-    Box::new(
-        client.call(CommandBuilder::examine(&label.name))
-            .collect()
-            .and_then(|(_, client)| {
-                let cmd = CommandBuilder::fetch()
-                    .all_after(1)
-                    .attr(Attribute::Envelope)
-                    .changed_since(29248804)
-                    .build();
-                client.call(cmd).for_each(|rd| {
-                    println!("server: {:?}", &rd.parsed());
-                    Ok(())
-                })
-            })
-            .and_then(|client| client.call(CommandBuilder::close()).collect())
-            .and_then(|(_, client)| ok(Context { client, conn }))
-            .map_err(|e| SyncError::from(e))
-    )
-}
-
-fn load_label(ctx: Context, label: &Label) -> Box<ContextFuture> {
-    let Context { client, conn } = ctx;
-    Box::new(
-        client.call(CommandBuilder::examine(&label.name))
-            .collect()
-            .map_err(|e| SyncError::from(e))
-            .and_then(|(label_meta, client)| {
-                let exists = label_meta.iter().filter_map(|rd| match *rd.parsed() {
-                    Response::MailboxData(MailboxDatum::Exists(num)) => Some(num),
-                    _ => None,
-                }).nth(0).unwrap();
-                let cmd = CommandBuilder::fetch()
-                    .num(exists)
-                    .attr(Attribute::Uid)
-                    .attr(Attribute::ModSeq)
-                    .attr(Attribute::InternalDate)
-                    .attr(Attribute::Rfc822)
-                    .build();
-                client.call(cmd)
+            .and_then(move |(seen_seq, istmt, conn, client)| {
+                let cmd = CommandBuilder::uid_fetch().all_after((seen_seq + 1) as u32);
+                let cmd = ResponseAccumulator::build_command_attributes(cmd);
+                client.call(cmd.build())
                     .map_err(|e| SyncError::from(e))
                     .fold(
-                         ResponseAccumulator::new(4),
-                         |acc, rd| ok::<ResponseAccumulator, SyncError>(acc.push(rd)),
+                        (conn, ResponseAccumulator::new()),
+                        move |(conn, acc), rd| {
+                            let (new, meta_opt) = acc.push(rd);
+                            if let Some(meta) = meta_opt {
+                                let msg = Message::from_slice(&meta.raw);
+                                let headers = msg.headers();
+                                conn.execute(&istmt, &[
+                                    &(meta.uid as i64),
+                                    &(meta.mod_seq as i64),
+                                    &meta.dt,
+                                    &headers.get_first("subject").map(|s| s.to_string()),
+                                    &headers.get_first("message-id").map(|s| s.to_string()),
+                                    &meta.raw,
+                                ])
+                                    .map_err(|e| {
+                                        eprintln!("PG error: {:?}", e);
+                                        SyncError::from(e)
+                                    })
+                                    .and_then(|(_, conn)| ok((conn, new)))
+                                    .boxed()
+                            } else {
+                                ok::<(Connection, ResponseAccumulator), SyncError>((conn, new))
+                                    .boxed()
+                            }
+                        },
                     )
             })
-            .join(conn.prepare("INSERT INTO messages (unid, mod_seq, raw)\
-                                VALUES ($1, $2, $3)")
-                .map_err(|e| SyncError::from(e)))
-            .and_then(|((acc, client), (stmt, conn))| {
-                let ResponseAccumulator { parts, mut full, .. } = acc;
-                assert_eq!(parts.len(), 0);
-                let metas: Vec<Result<MessageMeta, SyncError>> = full.drain().map(
-                    |(_, v)| Ok(v)
-                ).collect();
-                stream::iter(metas).fold((stmt, conn),
-                    |(stmt, conn), meta| {
-                        let raw = match *meta.raw.parsed() {
-                            Response::Fetch(_, ref attr_vals) => {
-                                let val = attr_vals.iter().find(|val|
-                                    match **val {
-                                        AttributeValue::Rfc822(_) => true,
-                                        _ => false,
-                                    }
-                                );
-                                match val {
-                                    Some(&AttributeValue::Rfc822(raw)) => Some(raw),
-                                    _ => None,
-                                }
-                            },
-                            _ => None,
-                        };
-                        println!("execute {} {}!", meta.uid, meta.mod_seq);
-                        conn.execute(&stmt, &[
-                            &(meta.uid as i64),
-                            &(meta.mod_seq as i64),
-                            &raw.unwrap(),
-                        ])
-                        .join(ok(stmt))
-                        .and_then(|((rows, conn), stmt)| {
-                            println!("{} rows", rows);
-                            ok((stmt, conn))
-                        })
-                    }
-                ).join(ok(client))
-            })
-            .and_then(|((_, conn), client)| {
-                client.call(CommandBuilder::close()).collect()
-                    .join(ok(conn))
+            .and_then(|((conn, _), client)| {
+                client.call(CommandBuilder::close())
+                    .collect()
                     .map_err(|e| SyncError::from(e))
+                    .join(ok(conn))
             })
             .and_then(|((_, client), conn)| ok(Context { client, conn }))
+            .map_err(|e| SyncError::from(e))
     )
-}
-
-struct ResponseAccumulator {
-    parts: HashMap<u32, (u32, Vec<ResponseData>)>,
-    full: HashMap<u32, MessageMeta>,
-    num_parts: u32,
-}
-
-impl ResponseAccumulator {
-    fn new(num_parts: u32) -> ResponseAccumulator {
-        ResponseAccumulator {
-            parts: HashMap::new(),
-            full: HashMap::new(),
-            num_parts,
-        }
-    }
-    fn push(mut self, rd: ResponseData) -> Self {
-        use AttributeValue::*;
-        let completed = {
-            let (idx, mut entry) = match *rd.parsed() {
-                Response::Fetch(idx, ref attr_vals) => {
-                    let mut entry = self.parts.entry(idx).or_insert((0, vec![]));
-                    for val in attr_vals.iter() {
-                        entry.0 += match *val {
-                            Uid(_) |
-                            ModSeq(_) |
-                            InternalDate(_) |
-                            Rfc822(_) => 1,
-                            _ => 0,
-                        };
-                    }
-                    (idx, entry)
-                },
-                _ => return self,
-            };
-            entry.1.push(rd);
-            if entry.0 == self.num_parts {
-                let mut date = None;
-                let mut mod_seq = None;
-                let mut uid = None;
-                let mut raw = None;
-                for rd in entry.1.drain(..) {
-                    let has_source = match *rd.parsed() {
-                        Response::Fetch(_, ref attr_vals) => {
-                            let mut rsp_source = false;
-                            for val in attr_vals.iter() {
-                                rsp_source |= match *val {
-                                    Uid(u) => {
-                                        uid = Some(u);
-                                        false
-                                    },
-                                    ModSeq(ms) => {
-                                        mod_seq = Some(ms);
-                                        false
-                                    },
-                                    InternalDate(id) => {
-                                        date = Some(id.to_string());
-                                        false
-                                    },
-                                    Rfc822(_) => true,
-                                    _ => false,
-                                }
-                            }
-                            rsp_source
-                        },
-                        _ => false,
-                    };
-                    if has_source {
-                        raw = Some(rd);
-                    }
-                }
-                Some((idx, MessageMeta {
-                    uid: uid.unwrap(),
-                    mod_seq: mod_seq.unwrap(),
-                    date: date.unwrap(),
-                    raw: raw.unwrap(),
-                }))
-            } else {
-                None
-            }
-        };
-        if let Some((idx, meta)) = completed {
-            self.parts.remove(&idx);
-            self.full.insert(idx, meta);
-        }
-        return self;
-    }
-}
-
-struct MessageMeta {
-    uid: u32,
-    mod_seq: u64,
-    date: String,
-    raw: ResponseData,
 }
