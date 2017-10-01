@@ -125,6 +125,8 @@ impl ResponseAccumulator {
                 let mut uid = None;
                 let mut mid = None;
                 let mut dt = None;
+                let mut subject = None;
+                let mut sender = None;
                 for rd in entry.1.drain(..) {
                     match *rd.parsed() {
                         Response::Fetch(_, ref attr_vals) => {
@@ -139,6 +141,13 @@ impl ResponseAccumulator {
                                     Envelope(ref env) => {
                                         mid = env.message_id.map(|r| r.to_string());
                                         dt = env.date.map(|r| r.to_string());
+                                        subject = env.subject.map(|r| r.to_string());
+                                        if let Some(ref senders) = env.sender {
+                                            sender = Some(format!("{} <{}@{}>",
+                                                                  senders[0].name.unwrap_or(""),
+                                                                  senders[0].mailbox.unwrap_or(""),
+                                                                  senders[0].host.unwrap_or("")));
+                                        }
                                     },
                                     _ => {},
                                 }
@@ -153,6 +162,8 @@ impl ResponseAccumulator {
                     mod_seq: mod_seq.unwrap(),
                     mid: mid,
                     date: dt,
+                    subject,
+                    sender,
                 })
             } else {
                 None
@@ -172,4 +183,6 @@ struct MessageMeta {
     mod_seq: u64,
     mid: Option<String>,
     date: Option<String>,
+    subject: Option<String>,
+    sender: Option<String>,
 }
