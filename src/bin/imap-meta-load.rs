@@ -1,8 +1,11 @@
+extern crate email_parser;
 #[macro_use]
 extern crate serde_derive;
 extern crate csv;
 extern crate mailsync;
 extern crate postgres;
+
+use email_parser::Message;
 
 use postgres::{Connection, TlsMode};
 
@@ -33,20 +36,31 @@ fn read_meta(fname: &str) -> MetaMap {
     map
 }
 
+fn sender_address(s: &str) -> &str {
+    let start = match s.find("<") {
+        Some(s) => s,
+        None => { return s.trim(); },
+    };
+    let started = &s[start + 1..];
+    let end = started.find(">").expect("'>' must be present in sender");
+    &started[..end]
+}
 
 fn process(map: MetaMap, conn: Connection) {
     let mut i = 0;
     let stmt = conn.prepare("UPDATE messages SET unid = $1, mod_seq = $2 WHERE id = $3").unwrap();
-    for row in &conn.query("SELECT id, dt, mid FROM messages", &[]).unwrap() {
+    for row in &conn.query("SELECT id, dt, mid, subject, raw FROM messages WHERE unid IS NULL ORDER BY id ASC", &[]).unwrap() {
 
         if i % 10000 == 0 {
             println!("processed {} messages", i);
         }
-        i += 0;
+        i += 1;
 
         let id: i32 = row.get(0);
         let mid: Option<String> = row.get(2);
+        let subject: Option<String> = row.get(3);
         if mid.is_none() {
+            //println!("no Message-ID for {}, skipping", id);
             continue;
         }
 
@@ -58,18 +72,74 @@ fn process(map: MetaMap, conn: Connection) {
         let metas = match map.get(&mid) {
             Some(m) => m,
             None => {
-                //println!("mid {} from {:?} not in map", mid, dt);
+                if mid.len() > 5 {
+                    match conn.execute("DELETE FROM messages WHERE id = $1", &[&id]) {
+                        Ok(_) => {},
+                        Err(e) => {
+                            println!("error while deleting message with id {}: {:?}", id, e);
+                        },
+                    }
+                }
                 continue;
             },
         };
+
+        let metas: Vec<&MessageMeta> = metas.iter().filter(|m| {
+            match (&m.subject, &subject) {
+                (&Some(ref meta_subj), &Some(ref db_subj)) => {
+                    if meta_subj.len() == 998 {
+                        (meta_subj as &str) == &db_subj[..998]
+                    } else {
+                        meta_subj == db_subj
+                    }
+                },
+                (&Some(_), &None) | (&None, &Some(_)) => false,
+                (&None, &None) => true,
+            }
+        }).collect();
+        if metas.is_empty() {
+            println!("no matches left after filtering based on subject = {:?}", subject);
+        }
+
+        let raw: String = row.get(4);
+        let msg = Message::from_slice(raw.as_bytes());
+        let headers = msg.headers();
+        let mut sender = headers.get_first("sender");
+        if sender.is_none() {
+            sender = headers.get_first("from");
+        }
+
+        let metas: Vec<&&MessageMeta> = metas.iter().filter(|m| {
+            println!("senders {:?} {:?}", m.sender, sender);
+            match (&m.sender, &sender) {
+                (&Some(ref meta_sender), &Some(ref db_sender)) => {
+                    let ms = sender_address(meta_sender);
+                    let ds = sender_address(db_sender);
+                    ms == ds
+                },
+                (&Some(_), &None) | (&None, &Some(_)) => false,
+                (&None, &None) => true,
+            }
+        }).collect();
+        if metas.is_empty() {
+            println!("no matches left after filtering based on sender = {:?}", sender);
+        }
+
+        println!("from {:?}", headers.get_first("from"));
+        println!("sent to {:?}", headers.get_first("to"));
+
         if metas.len() == 1 {
             let meta = metas.get(0).unwrap();
-            let res = stmt.execute(&[&(meta.uid as i64), &(meta.mod_seq as i64), &id]);
-            if res.is_err() {
-                println!("result {:?}", res);
+            match stmt.execute(&[&(meta.uid as i64), &(meta.mod_seq as i64), &id]) {
+                Ok(num) => println!("updated {} rows", num),
+                Err(e) => println!("update result {:?}", e),
             }
+            continue;
+        } else if metas.len() > 1 {
+            let meta = metas.get(0).unwrap();
+            println!("multiple matches for {} = {} (subject = {:?})", mid, metas.len(), meta.subject);
         } else {
-            println!("unexpected value for {} = {}", mid, metas.len());
+            println!("no matches left for {} (subject = {:?})", mid, subject);
         }
     }
 }
@@ -83,4 +153,6 @@ struct MessageMeta {
     mod_seq: u64,
     mid: Option<String>,
     date: Option<String>,
+    subject: Option<String>,
+    sender: Option<String>,
 }
