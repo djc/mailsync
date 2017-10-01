@@ -79,6 +79,7 @@ fn sync_messages(ctx: Context) -> Box<ContextFuture> {
                     .and_then(move |(istmt, conn)| ok((seen_seq, istmt, conn, client)))
             })
             .and_then(move |(seen_seq, istmt, conn, client)| {
+                eprintln!("Starting from UID {}...", seen_seq + 1);
                 let cmd = CommandBuilder::uid_fetch().all_after((seen_seq + 1) as u32);
                 let cmd = ResponseAccumulator::build_command_attributes(cmd);
                 client.call(cmd.build())
@@ -90,6 +91,7 @@ fn sync_messages(ctx: Context) -> Box<ContextFuture> {
                             if let Some(meta) = meta_opt {
                                 let msg = Message::from_slice(&meta.raw);
                                 let headers = msg.headers();
+                                eprintln!("Storing message from {} (UID {})", meta.dt, meta.uid);
                                 conn.execute(&istmt, &[
                                     &(meta.uid as i64),
                                     &(meta.mod_seq as i64),
