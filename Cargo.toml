@@ -11,12 +11,12 @@ futures = "*"
 futures-state-stream = "*"
 itertools = "*"
 mbox-reader = { path = "../mbox-reader" }
-postgres = { version = "0.15", features = ["with-chrono"] }
+postgres = { git = "https://github.com/sfackler/rust-postgres", features = ["with-chrono"] }
 serde = "*"
 serde_derive = "*"
 tokio-core = "*"
 tokio-imap = { path = "../tokio-imap" }
-tokio-postgres = "*"
+tokio-postgres = { git = "https://github.com/sfackler/rust-postgres", features = ["with-chrono"] }
 toml = "*"
 
 [replace]
