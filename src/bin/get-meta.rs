@@ -63,12 +63,13 @@ fn get_metadata<'a>(client: Client, writer: &'a mut csv::Writer<std::fs::File>) 
                     .range(start, end)
                     .attr(Attribute::Uid)
                     .attr(Attribute::ModSeq)
+                    .attr(Attribute::Flags)
                     .attr(Attribute::Envelope)
                     .build();
                 client.call(cmd)
                     .map_err(|e| SyncError::from(e))
                     .fold(
-                         ResponseAccumulator::new(3),
+                         ResponseAccumulator::new(4),
                          move |acc, rd| {
                              let (new, meta_opt) = acc.push(rd);
                              if let Some(meta) = meta_opt {
@@ -111,6 +112,7 @@ impl ResponseAccumulator {
                         entry.0 += match *val {
                             Uid(_) |
                             ModSeq(_) |
+                            Flags(_) |
                             Envelope(_) => 1,
                             _ => 0,
                         };
@@ -127,6 +129,7 @@ impl ResponseAccumulator {
                 let mut dt = None;
                 let mut subject = None;
                 let mut sender = None;
+                let mut flags = None;
                 for rd in entry.1.drain(..) {
                     match *rd.parsed() {
                         Response::Fetch(_, ref attr_vals) => {
@@ -137,6 +140,10 @@ impl ResponseAccumulator {
                                     },
                                     ModSeq(ms) => {
                                         mod_seq = Some(ms);
+                                    },
+                                    Flags(ref fs) => {
+                                        let list: Vec<&str> = fs.iter().map(|f| *f).collect();
+                                        flags = Some(list.join(" "));
                                     },
                                     Envelope(ref env) => {
                                         mid = env.message_id.map(|r| r.to_string());
@@ -160,6 +167,7 @@ impl ResponseAccumulator {
                     seq: idx,
                     uid: uid.unwrap(),
                     mod_seq: mod_seq.unwrap(),
+                    flags: flags.unwrap(),
                     mid: mid,
                     date: dt,
                     subject,
@@ -181,6 +189,7 @@ struct MessageMeta {
     seq: u32,
     uid: u32,
     mod_seq: u64,
+    flags: String,
     mid: Option<String>,
     date: Option<String>,
     subject: Option<String>,
