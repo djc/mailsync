@@ -91,23 +91,23 @@ fn sync_messages(ctx: Context) -> Box<ContextFuture> {
                                 let msg = Message::from_slice(&meta.raw);
                                 let headers = msg.headers();
                                 eprintln!("Storing message from {} (UID {})", meta.dt, meta.uid);
-                                conn.execute(&istmt, &[
-                                    &(meta.uid as i64),
-                                    &(meta.mod_seq as i64),
-                                    &meta.dt,
-                                    &headers.get_first("subject").map(|s| s.to_string()),
-                                    &headers.get_first("message-id").map(|s| s.to_string()),
-                                    &meta.raw,
-                                ])
-                                    .map_err(|e| {
-                                        eprintln!("PG error: {:?}", e);
-                                        SyncError::from(e)
-                                    })
-                                    .and_then(|(_, conn)| ok((conn, new)))
-                                    .boxed()
+                                Box::new(
+                                    conn.execute(&istmt, &[
+                                        &(meta.uid as i64),
+                                        &(meta.mod_seq as i64),
+                                        &meta.dt,
+                                        &headers.get_first("subject").map(|s| s.to_string()),
+                                        &headers.get_first("message-id").map(|s| s.to_string()),
+                                        &meta.raw,
+                                    ])
+                                        .map_err(|e| {
+                                            eprintln!("PG error: {:?}", e);
+                                            SyncError::from(e)
+                                        })
+                                        .and_then(|(_, conn)| ok((conn, new))))
+                                as Box<Future<Item=(Connection, ResponseAccumulator), Error=SyncError>>
                             } else {
-                                ok::<(Connection, ResponseAccumulator), SyncError>((conn, new))
-                                    .boxed()
+                                Box::new(ok::<(Connection, ResponseAccumulator), SyncError>((conn, new)))
                             }
                         },
                     )
