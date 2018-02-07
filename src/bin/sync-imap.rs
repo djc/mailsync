@@ -17,7 +17,6 @@ use mailsync::*;
 use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::str;
 
 use tokio_core::reactor::Core;
 
