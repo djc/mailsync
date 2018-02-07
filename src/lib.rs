@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::io;
 
 use tokio_imap::proto::*;
+use tokio_imap::types::*;
 use tokio_imap::client::builder::*;
 
 use tokio_postgres::Connection;

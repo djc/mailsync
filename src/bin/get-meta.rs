@@ -17,6 +17,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 use tokio_core::reactor::Core;
+use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::proto::*;
 use tokio_imap::Client;
 use tokio_imap::client::builder::*;
