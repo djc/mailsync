@@ -2,6 +2,10 @@ extern crate chrono;
 extern crate futures;
 extern crate futures_state_stream;
 #[macro_use]
+extern crate postgres;
+#[macro_use]
+extern crate postgres_derive;
+#[macro_use]
 extern crate serde_derive;
 extern crate toml;
 extern crate tokio_core;
@@ -39,6 +43,7 @@ impl ResponseAccumulator {
             .attr(Attribute::ModSeq)
             .attr(Attribute::InternalDate)
             .attr(Attribute::Rfc822)
+            .attr(Attribute::Flags)
     }
 
     pub fn push(mut self, rd: ResponseData) -> (Self, Option<MessageMeta>) {
@@ -53,6 +58,7 @@ impl ResponseAccumulator {
                             Uid(_) |
                             ModSeq(_) |
                             InternalDate(_) |
+                            Flags(_) |
                             Rfc822(_) => 1,
                             _ => 0,
                         };
@@ -65,11 +71,12 @@ impl ResponseAccumulator {
 
             // If we think all the parts are in, extract the relevant content
             // into a single structure
-            if entry.0 == 4 {
+            if entry.0 == 5 {
                 let mut seq = None;
                 let mut uid = None;
                 let mut mod_seq = None;
                 let mut dt = None;
+                let mut flags = None;
                 let mut source = None;
                 for rd in entry.1.drain(..) {
                     match *rd.parsed() {
@@ -87,6 +94,9 @@ impl ResponseAccumulator {
                                         let parsed = DateTime::parse_from_str(id, "%d-%b-%Y %H:%M:%S %z");
                                         dt = Some(parsed.unwrap());
                                     },
+                                    Flags(ref fs) => {
+                                        flags = Some(fs.iter().map(|s| (*s).into()).collect::<Vec<Flag>>());
+                                    },
                                     Rfc822(Some(src)) => {
                                         source = Some(src.to_vec());
                                     },
@@ -102,6 +112,7 @@ impl ResponseAccumulator {
                     uid: uid.unwrap(),
                     mod_seq: mod_seq.unwrap(),
                     dt: dt.unwrap(),
+                    flags: flags.unwrap(),
                     raw: source.unwrap(),
                 })
             } else {
@@ -125,7 +136,30 @@ pub struct MessageMeta {
     pub uid: u32,
     pub mod_seq: u64,
     pub dt: DateTime<FixedOffset>,
+    pub flags: Vec<Flag>,
     pub raw: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, FromSql, Serialize, ToSql)]
+#[postgres(name = "flags")]
+pub enum Flag {
+    #[postgres(name = "\\Answered")]
+    Answered,
+    #[postgres(name = "\\Flagged")]
+    Flagged,
+    #[postgres(name = "\\Seen")]
+    Seen,
+}
+
+impl<'a> From<&'a str> for Flag {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "\\Answered" => Flag::Answered,
+            "\\Flagged" => Flag::Flagged,
+            "\\Seen" => Flag::Seen,
+            _ => panic!("unsupported flag value '{}'", s),
+        }
+    }
 }
 
 #[derive(Deserialize)]

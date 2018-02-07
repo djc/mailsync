@@ -72,8 +72,8 @@ fn sync_messages(ctx: Context) -> Box<ContextFuture> {
             )
             .and_then(|((rows, conn), (_, client))| {
                 let seen_seq: i64 = rows[0].get(0);
-                conn.prepare("INSERT INTO messages (unid, mod_seq, dt, subject, mid, bytes) \
-                              VALUES ($1, $2, $3, $4, $5, $6)")
+                conn.prepare("INSERT INTO messages (unid, mod_seq, dt, subject, mid, bytes, flags) \
+                              VALUES ($1, $2, $3, $4, $5, $6, $7)")
                     .map_err(|e| SyncError::from(e))
                     .and_then(move |(istmt, conn)| ok((seen_seq, istmt, conn, client)))
             })
@@ -99,6 +99,7 @@ fn sync_messages(ctx: Context) -> Box<ContextFuture> {
                                         &headers.get_first("subject").map(|s| s.to_string()),
                                         &headers.get_first("message-id").map(|s| s.to_string()),
                                         &meta.raw,
+                                        &meta.flags,
                                     ])
                                         .map_err(|e| {
                                             eprintln!("PG error: {:?}", e);

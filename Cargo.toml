@@ -12,6 +12,7 @@ futures-state-stream = "*"
 itertools = "*"
 mbox-reader = { path = "../mbox-reader" }
 postgres = { git = "https://github.com/sfackler/rust-postgres", features = ["with-chrono"] }
+postgres-derive = "0.3.1"
 serde = "*"
 serde_derive = "*"
 tokio-core = "*"
