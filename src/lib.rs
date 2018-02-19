@@ -183,7 +183,7 @@ pub struct StoreConfig {
 pub type ContextFuture = Future<Item = Context, Error = SyncError>;
 
 pub struct Context {
-    pub client: tokio_imap::Client,
+    pub client: tokio_imap::TlsClient,
     pub conn: Connection,
 }
 

@@ -20,6 +20,7 @@ use std::io::Read;
 
 use tokio_core::reactor::Core;
 
+use tokio_imap::client::ImapClient;
 use tokio_imap::client::builder::*;
 
 use tokio_postgres::{Connection, TlsMode};
@@ -35,7 +36,8 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     core.run(
-        tokio_imap::Client::connect(&config.imap.server, &handle)
+        tokio_imap::client::connect(&config.imap.server)
+            .unwrap()
             .map_err(|e| SyncError::from(e))
             .and_then(|(client, _)| {
                 client

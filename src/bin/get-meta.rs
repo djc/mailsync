@@ -19,7 +19,7 @@ use std::str;
 use tokio_core::reactor::Core;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::proto::*;
-use tokio_imap::Client;
+use tokio_imap::{ImapClient, TlsClient};
 use tokio_imap::client::builder::*;
 
 fn main() {
@@ -31,9 +31,9 @@ fn main() {
 
     let mut core = Core::new().unwrap();
     let mut out = csv::Writer::from_path("imap-meta.csv").unwrap();
-    let handle = core.handle();
     core.run(
-        Client::connect(&config.imap.server, &handle)
+        tokio_imap::client::connect(&config.imap.server)
+            .unwrap()
             .map_err(|e| SyncError::from(e))
             .and_then(|(client, _)| {
                 client
@@ -48,7 +48,7 @@ fn main() {
     ).unwrap();
 }
 
-fn get_metadata<'a>(client: Client, writer: &'a mut csv::Writer<std::fs::File>) -> Box<Future<Item = Client, Error = SyncError> + 'a> {
+fn get_metadata<'a>(client: TlsClient, writer: &'a mut csv::Writer<std::fs::File>) -> Box<Future<Item = TlsClient, Error = SyncError> + 'a> {
     Box::new(
         client.call(CommandBuilder::examine("[Gmail]/All Mail"))
             .collect()
