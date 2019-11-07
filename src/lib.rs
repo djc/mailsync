@@ -46,10 +46,10 @@ impl ResponseAccumulator {
     }
 
     pub fn push(mut self, rd: ResponseData) -> (Self, Option<MessageMeta>) {
-        use AttributeValue::*;
+        use crate::AttributeValue::*;
 
         let completed = {
-            let (_, mut entry) = match *rd.parsed() {
+            let (_, entry) = match *rd.parsed() {
                 Response::Fetch(idx, ref attr_vals) => {
                     let mut entry = self.parts.entry(idx).or_insert((0, vec![]));
                     for val in attr_vals.iter() {
@@ -177,7 +177,7 @@ pub struct StoreConfig {
     pub uri: String,
 }
 
-pub type ContextFuture = Future<Item = Context, Error = SyncError>;
+pub type ContextFuture = dyn Future<Item = Context, Error = SyncError>;
 
 pub struct Context {
     pub client: tokio_imap::TlsClient,

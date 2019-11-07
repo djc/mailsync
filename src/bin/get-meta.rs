@@ -52,7 +52,7 @@ fn main() {
 fn get_metadata<'a>(
     client: TlsClient,
     writer: &'a mut csv::Writer<std::fs::File>,
-) -> Box<Future<Item = TlsClient, Error = SyncError> + 'a> {
+) -> Box<dyn Future<Item = TlsClient, Error = SyncError> + 'a> {
     Box::new(
         client
             .call(CommandBuilder::examine("[Gmail]/All Mail"))
@@ -113,9 +113,9 @@ impl ResponseAccumulator {
         }
     }
     fn push(mut self, rd: ResponseData) -> (Self, Option<MessageMeta>) {
-        use AttributeValue::*;
+        use crate::AttributeValue::*;
         let completed = {
-            let (idx, mut entry) = match *rd.parsed() {
+            let (idx, entry) = match *rd.parsed() {
                 Response::Fetch(idx, ref attr_vals) => {
                     let mut entry = self.parts.entry(idx).or_insert((0, vec![]));
                     for val in attr_vals.iter() {

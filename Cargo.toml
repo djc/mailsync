@@ -2,6 +2,7 @@
 name = "mailsync"
 version = "0.1.0"
 authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
+edition = "2018"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }

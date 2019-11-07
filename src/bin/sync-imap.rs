@@ -116,7 +116,7 @@ fn sync_messages(ctx: Context) -> Box<ContextFuture> {
                                     .and_then(|(_, conn)| ok((conn, new))),
                                 )
                                     as Box<
-                                        Future<
+                                        dyn Future<
                                             Item = (Connection, ResponseAccumulator),
                                             Error = SyncError,
                                         >,
