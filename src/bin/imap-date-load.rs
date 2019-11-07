@@ -1,11 +1,9 @@
-extern crate email_parser;
 #[macro_use]
 extern crate serde_derive;
-extern crate chrono;
-extern crate csv;
-extern crate itertools;
-extern crate mailsync;
-extern crate postgres;
+
+use csv;
+
+use itertools;
 
 use chrono::{DateTime, FixedOffset};
 

@@ -1,9 +1,5 @@
-extern crate chrono;
-extern crate email_parser;
-extern crate mbox_reader;
-extern crate postgres;
-
 use chrono::DateTime;
+use mbox_reader;
 
 use email_parser::Message;
 

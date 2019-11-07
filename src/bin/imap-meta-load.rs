@@ -1,9 +1,7 @@
-extern crate email_parser;
 #[macro_use]
 extern crate serde_derive;
-extern crate csv;
-extern crate mailsync;
-extern crate postgres;
+
+use csv;
 
 use email_parser::Message;
 

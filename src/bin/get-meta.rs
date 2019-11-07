@@ -1,13 +1,7 @@
-extern crate csv;
-extern crate futures;
-extern crate futures_state_stream;
-extern crate mailsync;
 #[macro_use]
 extern crate serde_derive;
-extern crate tokio_core;
-extern crate tokio_imap;
-extern crate toml;
 
+use csv;
 use futures::future::{ok, Future};
 use futures_state_stream::StateStream;
 use mailsync::*;
@@ -21,6 +15,7 @@ use tokio_imap::client::builder::*;
 use tokio_imap::proto::*;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::{ImapClient, TlsClient};
+use toml;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

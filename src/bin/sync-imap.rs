@@ -1,11 +1,4 @@
-extern crate email_parser;
-extern crate futures;
-extern crate futures_state_stream;
-extern crate mailsync;
-extern crate tokio_core;
-extern crate tokio_imap;
-extern crate tokio_postgres;
-extern crate toml;
+use toml;
 
 use email_parser::Message;
 

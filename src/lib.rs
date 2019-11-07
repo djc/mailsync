@@ -1,16 +1,12 @@
-extern crate chrono;
-extern crate futures;
-extern crate futures_state_stream;
 #[macro_use]
 extern crate postgres;
 #[macro_use]
 extern crate postgres_derive;
 #[macro_use]
 extern crate serde_derive;
-extern crate tokio_core;
-extern crate tokio_imap;
-extern crate tokio_postgres;
-extern crate toml;
+
+use tokio_imap;
+use tokio_postgres;
 
 use chrono::{DateTime, FixedOffset};
 
