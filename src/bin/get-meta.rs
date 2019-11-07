@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::env;
-use std::fs;
 use std::str;
 
-use futures::future::ok;
 use csv;
+use futures::future::ok;
 use serde_derive::{Deserialize, Serialize};
 use tokio_imap::client::builder::{
     CommandBuilder, FetchBuilderAttributes, FetchBuilderMessages, FetchBuilderModifiers,
@@ -12,15 +11,13 @@ use tokio_imap::client::builder::{
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::TlsClient;
-use toml;
 
 use mailsync::Config;
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = fs::read_to_string(&args[1]).unwrap();
-    let config: Config = toml::from_str(&s).unwrap();
+    let config = Config::from_file(&args[1]);
 
     let mut writer = csv::Writer::from_path("imap-meta.csv").unwrap();
     let (_, mut client) = TlsClient::connect(&config.imap.server).await.unwrap();

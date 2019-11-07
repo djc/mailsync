@@ -7,18 +7,21 @@ use email_parser::Message;
 use mbox_reader;
 use postgres::{Client, NoTls};
 
+use mailsync::Config;
+
 fn main() {
-    let mut args = env::args();
-    let name = PathBuf::from(args.nth(1).unwrap());
+    let args: Vec<String> = env::args().collect();
+    let name = PathBuf::from(&args[1]);
     let mbox = mbox_reader::MboxFile::from_file(&name).unwrap();
-    let conn = Client::connect("postgres://postgres@localhost:5432/mail-djc", NoTls).unwrap();
+    let config = Config::from_file(&args[2]);
+    let conn = Client::connect(&config.store.uri, NoTls).unwrap();
     process(mbox, conn);
 }
 
 fn process(mbox: mbox_reader::MboxFile, mut conn: Client) {
     let mut i = 0;
     let stmt = conn
-        .prepare("INSERT INTO messages (dt, subject, mid, raw) VALUES ($1, $2, $3, $4)")
+        .prepare("INSERT INTO messages (dt, subject, mid, bytes) VALUES ($1, $2, $3, $4)")
         .unwrap();
     for entry in mbox.iter() {
         if i % 1000 == 0 {
@@ -75,16 +78,7 @@ fn process(mbox: mbox_reader::MboxFile, mut conn: Client) {
             None => None as Option<String>,
         };
 
-        let text = str::from_utf8(&bytes).unwrap();
-        let res = if i == 251781 {
-            let mut vec = bytes.to_vec();
-            vec[6368] = b' ';
-            let s = str::from_utf8(&vec).unwrap();
-            conn.execute(&stmt, &[&dt, &subject, &message_id, &s])
-        } else {
-            conn.execute(&stmt, &[&dt, &subject, &message_id, &text])
-        };
-        match res {
+        match conn.execute(&stmt, &[&dt, &subject, &message_id, &bytes]) {
             Err(e) => {
                 println!("error for {}: {}", i, e);
             }

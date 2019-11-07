@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::io;
 
 use chrono::{DateTime, FixedOffset};
@@ -9,6 +10,7 @@ use tokio_imap::client::builder::{
 };
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, Response};
+use toml;
 
 pub struct ResponseAccumulator {
     parts: HashMap<u32, (u32, Vec<ResponseData>)>,
@@ -148,6 +150,13 @@ impl<'a> From<&'a str> for Flag {
 pub struct Config {
     pub imap: ImapConfig,
     pub store: StoreConfig,
+}
+
+impl Config {
+    pub fn from_file(name: &str) -> Self {
+        let s = fs::read_to_string(name).unwrap();
+        toml::from_str(&s).unwrap()
+    }
 }
 
 #[derive(Deserialize)]

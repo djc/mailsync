@@ -1,19 +1,16 @@
 use std::env;
-use std::fs;
 
 use email_parser::Message;
 use futures::future::FutureExt;
 use tokio_imap::client::builder::{CommandBuilder, FetchBuilderMessages, FetchBuilderModifiers};
 use tokio_postgres::NoTls;
-use toml;
 
 use mailsync::{Config, ResponseAccumulator};
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    let s = fs::read_to_string(&args[1]).unwrap();
-    let config: Config = toml::from_str(&s).unwrap();
+    let config: Config = Config::from_file(&args[1]);
 
     let (db, connection) = tokio_postgres::connect(&config.store.uri, NoTls)
         .await

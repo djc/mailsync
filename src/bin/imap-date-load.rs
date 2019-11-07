@@ -8,11 +8,14 @@ use email_parser::Message;
 use postgres::{Client, NoTls};
 use serde_derive::{Deserialize, Serialize};
 
+use mailsync::Config;
+
 fn main() {
-    let mut args = env::args();
-    let map = read_meta(&args.nth(1).unwrap());
+    let args: Vec<String> = env::args().collect();
+    let map = read_meta(&args[1]);
+    let config = Config::from_file(&args[2]);
     println!("metadata for {} messages found", map.len());
-    let conn = Client::connect("postgres://postgres@localhost:5432/mail-djc", NoTls).unwrap();
+    let conn = Client::connect(&config.store.uri, NoTls).unwrap();
     process(map, conn);
 }
 

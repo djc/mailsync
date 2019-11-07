@@ -7,11 +7,14 @@ use email_parser::Message;
 use postgres::{Client, NoTls};
 use serde_derive::{Deserialize, Serialize};
 
+use mailsync::Config;
+
 fn main() {
-    let mut args = env::args();
-    let map = read_meta(&args.nth(1).unwrap());
+    let args: Vec<String> = env::args().collect();
+    let map = read_meta(&args[1]);
+    let config = Config::from_file(&args[2]);
     println!("metadata for {} messages found", map.len());
-    let conn = Client::connect("postgres://postgres@localhost:5432/mail-djc", NoTls).unwrap();
+    let conn = Client::connect(&config.store.uri, NoTls).unwrap();
     process(map, conn);
 }
 
@@ -48,7 +51,7 @@ fn process(map: MetaMap, mut conn: Client) {
         .unwrap();
     for row in &conn
         .query(
-            "SELECT id, dt, mid, subject, raw FROM messages WHERE unid IS NULL ORDER BY id ASC",
+            "SELECT id, dt, mid, subject, bytes FROM messages WHERE unid IS NULL ORDER BY id ASC",
             &[],
         )
         .unwrap()
@@ -58,7 +61,7 @@ fn process(map: MetaMap, mut conn: Client) {
         }
         i += 1;
 
-        let id: i64 = row.get(0);
+        let id: i32 = row.get(0);
         let mid: Option<String> = row.get(2);
         let subject: Option<String> = row.get(3);
         if mid.is_none() {
@@ -87,7 +90,7 @@ fn process(map: MetaMap, mut conn: Client) {
         };
 
         let metas: Vec<&MessageMeta> = metas
-            .iter()
+            .into_iter()
             .filter(|m| match (&m.subject, &subject) {
                 (&Some(ref meta_subj), &Some(ref db_subj)) => {
                     if meta_subj.len() == 998 {
@@ -107,16 +110,16 @@ fn process(map: MetaMap, mut conn: Client) {
             );
         }
 
-        let raw: String = row.get(4);
-        let msg = Message::from_slice(raw.as_bytes());
+        let bytes: Vec<u8> = row.get(4);
+        let msg = Message::from_slice(&bytes);
         let headers = msg.headers();
         let mut sender = headers.get_first("sender");
         if sender.is_none() {
             sender = headers.get_first("from");
         }
 
-        let metas: Vec<&&MessageMeta> = metas
-            .iter()
+        let metas: Vec<&MessageMeta> = metas
+            .into_iter()
             .filter(|m| {
                 println!("senders {:?} {:?}", m.sender, sender);
                 match (&m.sender, &sender) {
