@@ -1,24 +1,18 @@
-#[macro_use]
-extern crate postgres;
-#[macro_use]
-extern crate postgres_derive;
-#[macro_use]
-extern crate serde_derive;
-
-use tokio_imap;
-use tokio_postgres;
-
-use chrono::{DateTime, FixedOffset};
-
-use futures::future::Future;
-
 use std::collections::HashMap;
 use std::io;
 
-use tokio_imap::client::builder::*;
-use tokio_imap::proto::*;
-use tokio_imap::types::*;
-
+use chrono::{DateTime, FixedOffset};
+use futures::future::Future;
+use postgres::to_sql_checked;
+use postgres_derive::{FromSql, ToSql};
+use serde_derive::{Deserialize, Serialize};
+use tokio_imap;
+use tokio_imap::client::builder::{
+    FetchBuilderAttributes, FetchCommandAttributes, FetchCommandMessages,
+};
+use tokio_imap::proto::ResponseData;
+use tokio_imap::types::{Attribute, AttributeValue, Response};
+use tokio_postgres;
 use tokio_postgres::Connection;
 
 pub struct ResponseAccumulator {

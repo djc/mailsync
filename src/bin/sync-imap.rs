@@ -1,22 +1,17 @@
-use toml;
-
-use email_parser::Message;
-
-use futures::future::{ok, Future};
-use futures_state_stream::StateStream;
-
-use mailsync::*;
-
 use std::env;
 use std::fs::File;
 use std::io::Read;
 
+use email_parser::Message;
+use futures::future::{ok, Future};
+use futures_state_stream::StateStream;
 use tokio_core::reactor::Core;
-
 use tokio_imap::client::builder::*;
 use tokio_imap::client::{ImapClient, TlsClient};
-
 use tokio_postgres::{Connection, TlsMode};
+use toml;
+
+use mailsync::{Config, Context, ContextFuture, ResponseAccumulator, SyncError};
 
 fn main() {
     let args: Vec<String> = env::args().collect();

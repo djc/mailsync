@@ -1,15 +1,11 @@
-#[macro_use]
-extern crate serde_derive;
-
-use csv;
-
-use email_parser::Message;
-
-use postgres::{Connection, TlsMode};
-
 use std::collections::HashMap;
 use std::env;
 use std::str;
+
+use csv;
+use email_parser::Message;
+use postgres::{Connection, TlsMode};
+use serde_derive::{Deserialize, Serialize};
 
 fn main() {
     let mut args = env::args();

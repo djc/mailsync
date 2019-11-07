@@ -1,22 +1,23 @@
-#[macro_use]
-extern crate serde_derive;
-
-use csv;
-use futures::future::{ok, Future};
-use futures_state_stream::StateStream;
-use mailsync::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::str;
+
+use csv;
+use futures::future::{ok, Future};
+use futures_state_stream::StateStream;
+use serde_derive::{Deserialize, Serialize};
 use tokio_core::reactor::Core;
-use tokio_imap::client::builder::*;
-use tokio_imap::proto::*;
+use tokio_imap::client::builder::{
+    CommandBuilder, FetchBuilderAttributes, FetchBuilderMessages, FetchBuilderModifiers,
+};
+use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::{ImapClient, TlsClient};
 use toml;
 
+use mailsync::{Config, SyncError};
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut f = File::open(&args[1]).unwrap();

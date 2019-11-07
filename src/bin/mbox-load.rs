@@ -1,13 +1,11 @@
-use chrono::DateTime;
-use mbox_reader;
-
-use email_parser::Message;
-
-use postgres::{Connection, TlsMode};
-
 use std::env;
 use std::path::PathBuf;
 use std::str;
+
+use chrono::DateTime;
+use email_parser::Message;
+use mbox_reader;
+use postgres::{Connection, TlsMode};
 
 fn main() {
     let mut args = env::args();
