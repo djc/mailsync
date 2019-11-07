@@ -1,11 +1,11 @@
 extern crate email_parser;
 #[macro_use]
 extern crate serde_derive;
+extern crate chrono;
 extern crate csv;
+extern crate itertools;
 extern crate mailsync;
 extern crate postgres;
-extern crate chrono;
-extern crate itertools;
 
 use chrono::{DateTime, FixedOffset};
 
@@ -13,16 +13,16 @@ use email_parser::Message;
 
 use postgres::{Connection, TlsMode};
 
+use std::collections::HashMap;
 use std::env;
 use std::str;
-use std::collections::HashMap;
 
 fn main() {
     let mut args = env::args();
     let map = read_meta(&args.nth(1).unwrap());
     println!("metadata for {} messages found", map.len());
-    let conn = Connection::connect("postgres://postgres@localhost:5432/mail-djc",
-                                   TlsMode::None).unwrap();
+    let conn =
+        Connection::connect("postgres://postgres@localhost:5432/mail-djc", TlsMode::None).unwrap();
     process(map, conn);
 }
 
@@ -47,7 +47,12 @@ fn fuzzy_datetime_parser(orig: &str) -> Option<DateTime<FixedOffset>> {
     s = s.replace("-0060", "-0100");
     s = s.replace("-05-30", "-0530");
     s = s.replace(" t0100", " +0100");
-    let mut parts = s.replace("  ", " ").split(" ").take(5).map(|s| s.to_string()).collect::<Vec<String>>();
+    let mut parts = s
+        .replace("  ", " ")
+        .split(" ")
+        .take(5)
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
     if parts.len() > 3 && parts[3].contains(".") {
         let mut t = parts.remove(3);
         t = t.replace(".", ":");
@@ -111,12 +116,12 @@ fn read_meta(fname: &str) -> MetaMap {
     for result in reader.deserialize() {
         let meta: MessageMeta = result.unwrap();
         let dt = match meta.date {
-            Some(ref orig) => {
-                match fuzzy_datetime_parser(orig) {
-                    Some(dt) => dt,
-                    None => { continue; },
+            Some(ref orig) => match fuzzy_datetime_parser(orig) {
+                Some(dt) => dt,
+                None => {
+                    continue;
                 }
-            }
+            },
             None => {
                 continue;
                 //panic!("no message-id for message with index {}", meta.seq)
@@ -127,13 +132,19 @@ fn read_meta(fname: &str) -> MetaMap {
     map
 }
 
-
 fn process(map: MetaMap, conn: Connection) {
     let mut i = 0;
     let mut matched = 0;
-    let stmt = conn.prepare("UPDATE messages SET unid = $1, mod_seq = $2 WHERE id = $3").unwrap();
-    for row in &conn.query("SELECT id, raw FROM messages WHERE unid IS NULL ORDER BY id ASC", &[]).unwrap() {
-
+    let stmt = conn
+        .prepare("UPDATE messages SET unid = $1, mod_seq = $2 WHERE id = $3")
+        .unwrap();
+    for row in &conn
+        .query(
+            "SELECT id, raw FROM messages WHERE unid IS NULL ORDER BY id ASC",
+            &[],
+        )
+        .unwrap()
+    {
         if i % 10000 == 0 {
             println!("processed {} messages", i);
         }
@@ -148,18 +159,25 @@ fn process(map: MetaMap, conn: Connection) {
                 None => {
                     println!("unparsable date/time {:?} for id {}", s, id);
                     continue;
-                },
+                }
                 Some(dt) => dt,
             },
-            None => { continue; },
+            None => {
+                continue;
+            }
         };
 
         let metas = match map.get(&snd_dt) {
             Some(m) => m,
             None => {
-                println!("{} not found in map (id {}, mid {:?})", snd_dt, id, headers.get_first("message-id"));
+                println!(
+                    "{} not found in map (id {}, mid {:?})",
+                    snd_dt,
+                    id,
+                    headers.get_first("message-id")
+                );
                 continue;
-            },
+            }
         };
         if metas.len() == 1 {
             let meta = metas.get(0).unwrap();
@@ -172,7 +190,6 @@ fn process(map: MetaMap, conn: Connection) {
         } else {
             println!("unexpected value for {} = {}", snd_dt, metas.len());
         }
-
     }
     println!("matched {} messages based on send date", matched);
 }

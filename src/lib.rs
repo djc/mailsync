@@ -7,10 +7,10 @@ extern crate postgres;
 extern crate postgres_derive;
 #[macro_use]
 extern crate serde_derive;
-extern crate toml;
 extern crate tokio_core;
 extern crate tokio_imap;
 extern crate tokio_postgres;
+extern crate toml;
 
 use chrono::{DateTime, FixedOffset};
 
@@ -19,12 +19,11 @@ use futures::future::Future;
 use std::collections::HashMap;
 use std::io;
 
+use tokio_imap::client::builder::*;
 use tokio_imap::proto::*;
 use tokio_imap::types::*;
-use tokio_imap::client::builder::*;
 
 use tokio_postgres::Connection;
-
 
 pub struct ResponseAccumulator {
     parts: HashMap<u32, (u32, Vec<ResponseData>)>,
@@ -55,16 +54,12 @@ impl ResponseAccumulator {
                     let mut entry = self.parts.entry(idx).or_insert((0, vec![]));
                     for val in attr_vals.iter() {
                         entry.0 += match *val {
-                            Uid(_) |
-                            ModSeq(_) |
-                            InternalDate(_) |
-                            Flags(_) |
-                            Rfc822(_) => 1,
+                            Uid(_) | ModSeq(_) | InternalDate(_) | Flags(_) | Rfc822(_) => 1,
                             _ => 0,
                         };
                     }
                     (idx, entry)
-                },
+                }
                 _ => return (self, None),
             };
             entry.1.push(rd);
@@ -86,25 +81,28 @@ impl ResponseAccumulator {
                                 match *val {
                                     Uid(u) => {
                                         uid = Some(u);
-                                    },
+                                    }
                                     ModSeq(ms) => {
                                         mod_seq = Some(ms);
-                                    },
+                                    }
                                     InternalDate(id) => {
-                                        let parsed = DateTime::parse_from_str(id, "%d-%b-%Y %H:%M:%S %z");
+                                        let parsed =
+                                            DateTime::parse_from_str(id, "%d-%b-%Y %H:%M:%S %z");
                                         dt = Some(parsed.unwrap());
-                                    },
+                                    }
                                     Flags(ref fs) => {
-                                        flags = Some(fs.iter().map(|s| (*s).into()).collect::<Vec<Flag>>());
-                                    },
+                                        flags = Some(
+                                            fs.iter().map(|s| (*s).into()).collect::<Vec<Flag>>(),
+                                        );
+                                    }
                                     Rfc822(Some(src)) => {
                                         source = Some(src.to_vec());
-                                    },
-                                    _ => {},
+                                    }
+                                    _ => {}
                                 }
                             }
-                        },
-                        _ => {},
+                        }
+                        _ => {}
                     };
                 }
                 Some(MessageMeta {
@@ -126,7 +124,6 @@ impl ResponseAccumulator {
             self.parts.remove(&meta.seq);
         }
         (self, completed)
-
     }
 }
 
@@ -221,7 +218,4 @@ macro_rules! error_enum {
     };
 }
 
-error_enum!(SyncError,
-    Io: io::Error,
-    Pg: tokio_postgres::error::Error,
-);
+error_enum!(SyncError, Io: io::Error, Pg: tokio_postgres::error::Error,);

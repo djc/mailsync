@@ -10,21 +10,22 @@ use email_parser::Message;
 use postgres::{Connection, TlsMode};
 
 use std::env;
-use std::str;
 use std::path::PathBuf;
+use std::str;
 
 fn main() {
     let mut args = env::args();
     let name = PathBuf::from(args.nth(1).unwrap());
     let mbox = mbox_reader::MboxFile::from_file(&name).unwrap();
-    let conn = Connection::connect("postgres://postgres@localhost:5432/mail-djc",
-                                   TlsMode::None).unwrap();
+    let conn =
+        Connection::connect("postgres://postgres@localhost:5432/mail-djc", TlsMode::None).unwrap();
     process(mbox, conn);
 }
 
 fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
     let mut i = 0;
-    let stmt = conn.prepare("INSERT INTO messages (dt, subject, mid, raw) VALUES ($1, $2, $3, $4)")
+    let stmt = conn
+        .prepare("INSERT INTO messages (dt, subject, mid, raw) VALUES ($1, $2, $3, $4)")
         .unwrap();
     for entry in mbox.iter() {
         if i % 1000 == 0 {
@@ -43,7 +44,7 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
                 if !tid.starts_with("X-GM-THRID:") {
                     println!("unexpected first header: {:?}", tid);
                 }
-            },
+            }
             None => panic!("first header not found: {:?}", bytes),
         }
 
@@ -57,7 +58,7 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
                     if !lbls.starts_with("X-Gmail-Labels:") {
                         println!("unexpected second header: {:?}", lbls);
                     }
-                },
+                }
                 None => panic!("second header not found: {:?}", bytes),
             }
             rest = split.next().unwrap();
@@ -93,11 +94,9 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
         match res {
             Err(e) => {
                 println!("error for {}: {}", i, e);
-            },
-            _ => {},
+            }
+            _ => {}
         }
-
     }
     println!("DONE {}", i);
-
 }
