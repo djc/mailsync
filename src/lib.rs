@@ -2,18 +2,13 @@ use std::collections::HashMap;
 use std::io;
 
 use chrono::{DateTime, FixedOffset};
-use futures::future::Future;
-use postgres::to_sql_checked;
-use postgres_derive::{FromSql, ToSql};
+use postgres_types::{FromSql, ToSql};
 use serde_derive::{Deserialize, Serialize};
-use tokio_imap;
 use tokio_imap::client::builder::{
     FetchBuilderAttributes, FetchCommandAttributes, FetchCommandMessages,
 };
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, Response};
-use tokio_postgres;
-use tokio_postgres::Connection;
 
 pub struct ResponseAccumulator {
     parts: HashMap<u32, (u32, Vec<ResponseData>)>,
@@ -167,11 +162,9 @@ pub struct StoreConfig {
     pub uri: String,
 }
 
-pub type ContextFuture = dyn Future<Item = Context, Error = SyncError>;
-
 pub struct Context {
     pub client: tokio_imap::TlsClient,
-    pub conn: Connection,
+    pub db: tokio_postgres::Client,
 }
 
 #[derive(Debug)]
@@ -179,13 +172,6 @@ pub struct Label {
     pub id: i32,
     pub name: String,
     pub mod_seq: Option<i64>,
-}
-
-impl From<(tokio_postgres::Error, Connection)> for SyncError {
-    fn from(e: (tokio_postgres::Error, Connection)) -> Self {
-        let (e, _) = e;
-        SyncError::from(e)
-    }
 }
 
 macro_rules! error_enum_impls {

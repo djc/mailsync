@@ -1,99 +1,82 @@
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::Read;
+use std::fs;
 use std::str;
 
+use futures::future::ok;
 use csv;
-use futures::future::{ok, Future};
-use futures_state_stream::StateStream;
 use serde_derive::{Deserialize, Serialize};
-use tokio_core::reactor::Core;
 use tokio_imap::client::builder::{
     CommandBuilder, FetchBuilderAttributes, FetchBuilderMessages, FetchBuilderModifiers,
 };
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
-use tokio_imap::{ImapClient, TlsClient};
+use tokio_imap::TlsClient;
 use toml;
 
-use mailsync::{Config, SyncError};
-fn main() {
+use mailsync::Config;
+
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = env::args().collect();
-    let mut f = File::open(&args[1]).unwrap();
-    let mut s = String::new();
-    f.read_to_string(&mut s).unwrap();
+    let s = fs::read_to_string(&args[1]).unwrap();
     let config: Config = toml::from_str(&s).unwrap();
 
-    let mut core = Core::new().unwrap();
-    let mut out = csv::Writer::from_path("imap-meta.csv").unwrap();
-    core.run(
-        TlsClient::connect(&config.imap.server)
-            .unwrap()
-            .map_err(|e| SyncError::from(e))
-            .and_then(|(_, client)| {
-                client
-                    .call(CommandBuilder::login(
-                        &config.imap.account,
-                        &config.imap.password,
-                    ))
-                    .collect()
-                    .map_err(|e| SyncError::from(e))
-            })
-            .and_then(|(_, client)| get_metadata(client, &mut out)),
-    )
-    .unwrap();
-}
+    let mut writer = csv::Writer::from_path("imap-meta.csv").unwrap();
+    let (_, mut client) = TlsClient::connect(&config.imap.server).await.unwrap();
+    let _ = client
+        .call(CommandBuilder::login(
+            &config.imap.account,
+            &config.imap.password,
+        ))
+        .try_collect()
+        .await
+        .unwrap();
 
-fn get_metadata<'a>(
-    client: TlsClient,
-    writer: &'a mut csv::Writer<std::fs::File>,
-) -> Box<dyn Future<Item = TlsClient, Error = SyncError> + 'a> {
-    Box::new(
-        client
-            .call(CommandBuilder::examine("[Gmail]/All Mail"))
-            .collect()
-            .map_err(|e| SyncError::from(e))
-            .and_then(|(msgs, client)| {
-                let exists = msgs
-                    .iter()
-                    .filter_map(|rd| match *rd.parsed() {
-                        Response::MailboxData(MailboxDatum::Exists(num)) => Some(num),
-                        _ => None,
-                    })
-                    .nth(0)
-                    .unwrap();
-                let (start, end) = (1, exists);
-                println!("fetch metadata for {}:{}", start, end);
-                let cmd = CommandBuilder::fetch()
-                    .range(start, end)
-                    .attr(Attribute::Uid)
-                    .attr(Attribute::ModSeq)
-                    .attr(Attribute::Flags)
-                    .attr(Attribute::Envelope)
-                    .build();
-                client.call(cmd).map_err(|e| SyncError::from(e)).fold(
-                    ResponseAccumulator::new(4),
-                    move |acc, rd| {
-                        let (new, meta_opt) = acc.push(rd);
-                        if let Some(meta) = meta_opt {
-                            if meta.seq % 1000 == 0 {
-                                println!("store metadata for index {}", meta.seq);
-                            }
-                            writer.serialize(meta).unwrap();
-                        }
-                        ok::<ResponseAccumulator, SyncError>(new)
-                    },
-                )
-            })
-            .and_then(|(_, client)| {
-                client
-                    .call(CommandBuilder::close())
-                    .collect()
-                    .map_err(|e| SyncError::from(e))
-                    .and_then(|(_, client)| ok(client))
-            }),
-    )
+    let msgs = client
+        .call(CommandBuilder::examine("[Gmail]/All Mail"))
+        .try_collect()
+        .await
+        .unwrap();
+    let exists = msgs
+        .iter()
+        .filter_map(|rd| match *rd.parsed() {
+            Response::MailboxData(MailboxDatum::Exists(num)) => Some(num),
+            _ => None,
+        })
+        .nth(0)
+        .unwrap();
+
+    let (start, end) = (1, exists);
+    println!("fetch metadata for {}:{}", start, end);
+    let cmd = CommandBuilder::fetch()
+        .range(start, end)
+        .attr(Attribute::Uid)
+        .attr(Attribute::ModSeq)
+        .attr(Attribute::Flags)
+        .attr(Attribute::Envelope)
+        .build();
+
+    let _ = client
+        .call(cmd)
+        .try_fold(ResponseAccumulator::new(4), |acc, rd| {
+            let (new, meta_opt) = acc.push(rd);
+            if let Some(meta) = meta_opt {
+                if meta.seq % 1000 == 0 {
+                    println!("store metadata for index {}", meta.seq);
+                }
+                writer.serialize(meta).unwrap();
+            }
+            ok(new)
+        })
+        .await
+        .unwrap();
+
+    let _ = client
+        .call(CommandBuilder::close())
+        .try_collect()
+        .await
+        .unwrap();
 }
 
 struct ResponseAccumulator {

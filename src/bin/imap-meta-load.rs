@@ -4,15 +4,14 @@ use std::str;
 
 use csv;
 use email_parser::Message;
-use postgres::{Connection, TlsMode};
+use postgres::{Client, NoTls};
 use serde_derive::{Deserialize, Serialize};
 
 fn main() {
     let mut args = env::args();
     let map = read_meta(&args.nth(1).unwrap());
     println!("metadata for {} messages found", map.len());
-    let conn =
-        Connection::connect("postgres://postgres@localhost:5432/mail-djc", TlsMode::None).unwrap();
+    let conn = Client::connect("postgres://postgres@localhost:5432/mail-djc", NoTls).unwrap();
     process(map, conn);
 }
 
@@ -42,7 +41,7 @@ fn sender_address(s: &str) -> &str {
     &started[..end]
 }
 
-fn process(map: MetaMap, conn: Connection) {
+fn process(map: MetaMap, mut conn: Client) {
     let mut i = 0;
     let stmt = conn
         .prepare("UPDATE messages SET unid = $1, mod_seq = $2 WHERE id = $3")
@@ -59,7 +58,7 @@ fn process(map: MetaMap, conn: Connection) {
         }
         i += 1;
 
-        let id: i32 = row.get(0);
+        let id: i64 = row.get(0);
         let mid: Option<String> = row.get(2);
         let subject: Option<String> = row.get(3);
         if mid.is_none() {
@@ -143,7 +142,7 @@ fn process(map: MetaMap, conn: Connection) {
 
         if metas.len() == 1 {
             let meta = metas.get(0).unwrap();
-            match stmt.execute(&[&(meta.uid as i64), &(meta.mod_seq as i64), &id]) {
+            match conn.execute(&stmt, &[&(meta.uid as i64), &(meta.mod_seq as i64), &id]) {
                 Ok(num) => println!("updated {} rows", num),
                 Err(e) => println!("update result {:?}", e),
             }

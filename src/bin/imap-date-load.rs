@@ -5,16 +5,14 @@ use std::str;
 use chrono::{DateTime, FixedOffset};
 use csv;
 use email_parser::Message;
-use itertools;
-use postgres::{Connection, TlsMode};
+use postgres::{Client, NoTls};
 use serde_derive::{Deserialize, Serialize};
 
 fn main() {
     let mut args = env::args();
     let map = read_meta(&args.nth(1).unwrap());
     println!("metadata for {} messages found", map.len());
-    let conn =
-        Connection::connect("postgres://postgres@localhost:5432/mail-djc", TlsMode::None).unwrap();
+    let conn = Client::connect("postgres://postgres@localhost:5432/mail-djc", NoTls).unwrap();
     process(map, conn);
 }
 
@@ -86,7 +84,7 @@ fn fuzzy_datetime_parser(orig: &str) -> Option<DateTime<FixedOffset>> {
     if parts.len() < 5 {
         parts.push("+0000".to_string());
     }
-    let new = itertools::join(parts, " ");
+    let new = parts.join(" ");
     for (i, fmt) in FORMATS.iter().enumerate() {
         let parsed = DateTime::parse_from_str(&new, fmt);
         match parsed {
@@ -124,7 +122,7 @@ fn read_meta(fname: &str) -> MetaMap {
     map
 }
 
-fn process(map: MetaMap, conn: Connection) {
+fn process(map: MetaMap, mut conn: Client) {
     let mut i = 0;
     let mut matched = 0;
     let stmt = conn
@@ -142,7 +140,7 @@ fn process(map: MetaMap, conn: Connection) {
         }
 
         i += 1;
-        let id: i32 = row.get(0);
+        let id: i64 = row.get(0);
         let raw: String = row.get(1);
         let msg = Message::from_slice(raw.as_bytes());
         let headers = msg.headers();
@@ -173,7 +171,7 @@ fn process(map: MetaMap, conn: Connection) {
         };
         if metas.len() == 1 {
             let meta = metas.get(0).unwrap();
-            let res = stmt.execute(&[&(meta.uid as i64), &(meta.mod_seq as i64), &id]);
+            let res = conn.execute(&stmt, &[&(meta.uid as i64), &(meta.mod_seq as i64), &id]);
             if res.is_err() {
                 println!("result {:?}", res);
             } else {

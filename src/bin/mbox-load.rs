@@ -5,18 +5,17 @@ use std::str;
 use chrono::DateTime;
 use email_parser::Message;
 use mbox_reader;
-use postgres::{Connection, TlsMode};
+use postgres::{Client, NoTls};
 
 fn main() {
     let mut args = env::args();
     let name = PathBuf::from(args.nth(1).unwrap());
     let mbox = mbox_reader::MboxFile::from_file(&name).unwrap();
-    let conn =
-        Connection::connect("postgres://postgres@localhost:5432/mail-djc", TlsMode::None).unwrap();
+    let conn = Client::connect("postgres://postgres@localhost:5432/mail-djc", NoTls).unwrap();
     process(mbox, conn);
 }
 
-fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
+fn process(mbox: mbox_reader::MboxFile, mut conn: Client) {
     let mut i = 0;
     let stmt = conn
         .prepare("INSERT INTO messages (dt, subject, mid, raw) VALUES ($1, $2, $3, $4)")
@@ -81,9 +80,9 @@ fn process(mbox: mbox_reader::MboxFile, conn: Connection) {
             let mut vec = bytes.to_vec();
             vec[6368] = b' ';
             let s = str::from_utf8(&vec).unwrap();
-            stmt.execute(&[&dt, &subject, &message_id, &s])
+            conn.execute(&stmt, &[&dt, &subject, &message_id, &s])
         } else {
-            stmt.execute(&[&dt, &subject, &message_id, &text])
+            conn.execute(&stmt, &[&dt, &subject, &message_id, &text])
         };
         match res {
             Err(e) => {
