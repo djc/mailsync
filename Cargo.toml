@@ -16,7 +16,7 @@ postgres-derive = "0.3.1"
 serde = "1"
 serde_derive = "1"
 tokio-core = "0.1.9"
-tokio-imap = { git = "https://github.com/djc/tokio-imap", rev = "b1acecc75757ca359cc32eecb12e7884607a27c8" }
+tokio-imap = "0.4.0"
 tokio-postgres = { git = "https://github.com/sfackler/rust-postgres", features = ["with-chrono"], rev = "acb424afa4cbb06433da8720ee1d977e6bf53a4f" }
 toml = "0.4.5"
 

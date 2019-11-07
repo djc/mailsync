@@ -32,10 +32,10 @@ fn main() {
     let mut core = Core::new().unwrap();
     let mut out = csv::Writer::from_path("imap-meta.csv").unwrap();
     core.run(
-        tokio_imap::client::connect(&config.imap.server)
+        TlsClient::connect(&config.imap.server)
             .unwrap()
             .map_err(|e| SyncError::from(e))
-            .and_then(|(client, _)| {
+            .and_then(|(_, client)| {
                 client
                     .call(CommandBuilder::login(
                         &config.imap.account,
