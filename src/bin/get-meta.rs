@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::env;
 use std::str;
 
 use futures::future::ok;
 use serde_derive::{Deserialize, Serialize};
+use structopt::StructOpt;
 use tokio_imap::client::builder::{
     CommandBuilder, FetchBuilderAttributes, FetchBuilderMessages, FetchBuilderModifiers,
 };
@@ -15,8 +15,8 @@ use mailsync::Config;
 
 #[tokio::main]
 async fn main() {
-    let args: Vec<String> = env::args().collect();
-    let config = Config::from_file(&args[1]);
+    let options = Options::from_args();
+    let config = Config::from_file(&options.config);
 
     let mut writer = csv::Writer::from_path("imap-meta.csv").unwrap();
     let (_, mut client) = TlsClient::connect(&config.imap.server).await.unwrap();
@@ -73,6 +73,12 @@ async fn main() {
         .try_collect()
         .await
         .unwrap();
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "get-meta")]
+struct Options {
+    config: String,
 }
 
 struct ResponseAccumulator {
