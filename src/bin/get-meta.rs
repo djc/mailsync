@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::str;
 
+use bincode;
 use futures::future::ok;
 use serde_derive::{Deserialize, Serialize};
+use sled;
 use structopt::StructOpt;
 use tokio_imap::client::builder::{
     CommandBuilder, FetchBuilderAttributes, FetchBuilderMessages, FetchBuilderModifiers,
@@ -18,7 +20,11 @@ async fn main() {
     let options = Options::from_args();
     let config = Config::from_file(&options.config);
 
-    let mut writer = csv::Writer::from_path("imap-meta.csv").unwrap();
+    let db = sled::open("mail.sled").unwrap();
+    let tree = db.open_tree("meta").unwrap();
+    let mut batch = sled::Batch::default();
+    let mut wrote = (0usize, 0usize);
+
     let (_, mut client) = TlsClient::connect(&config.imap.server).await.unwrap();
     let _ = client
         .call(CommandBuilder::login(
@@ -44,7 +50,7 @@ async fn main() {
         .unwrap();
 
     let (start, end) = (1, exists);
-    println!("fetch metadata for {}:{}", start, end);
+    println!("fetch metadata for {}:{}...", start, end);
     let cmd = CommandBuilder::fetch()
         .range(start, end)
         .attr(Attribute::Uid)
@@ -61,7 +67,12 @@ async fn main() {
                 if meta.seq % 1000 == 0 {
                     println!("store metadata for index {}", meta.seq);
                 }
-                writer.serialize(meta).unwrap();
+
+                let key = meta.uid.to_le_bytes();
+                let serialized = bincode::serialize(&meta).unwrap();
+                wrote.0 += 1;
+                wrote.1 += serialized.len();
+                batch.insert(&key, serialized);
             }
             ok(new)
         })
@@ -73,6 +84,12 @@ async fn main() {
         .try_collect()
         .await
         .unwrap();
+
+    println!(
+        "commit transaction ({} items, total size {})...",
+        wrote.0, wrote.1
+    );
+    tree.apply_batch(batch).unwrap();
 }
 
 #[derive(Debug, StructOpt)]

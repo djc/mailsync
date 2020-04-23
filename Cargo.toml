@@ -5,6 +5,7 @@ authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
 edition = "2018"
 
 [dependencies]
+bincode = "1.2.1"
 chrono = { version = "0.4", features = ["serde"] }
 csv = "1"
 email-parser = { path = "../email-parser" }
@@ -14,6 +15,7 @@ postgres = { version = "0.17", features = ["with-chrono-0_4"] }
 postgres-types = { version = "0.1", features = ["derive"] }
 serde = "1"
 serde_derive = "1"
+sled = "0.31"
 structopt = "0.3"
 tokio = { version = "0.2", features = ["macros"] }
 tokio-imap = { path = "../tokio-imap/tokio-imap" }
