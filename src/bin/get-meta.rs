@@ -129,15 +129,24 @@ impl ResponseAccumulator {
                                         flags = Some(list.join(" "));
                                     }
                                     Envelope(ref env) => {
-                                        mid = env.message_id.map(|r| r.to_string());
-                                        dt = env.date.map(|r| r.to_string());
-                                        subject = env.subject.map(|r| r.to_string());
+                                        mid = env
+                                            .message_id
+                                            .map(|r| String::from_utf8_lossy(r).into());
+                                        dt = env.date.map(|r| String::from_utf8_lossy(r).into());
+                                        subject =
+                                            env.subject.map(|r| String::from_utf8_lossy(r).into());
                                         if let Some(ref senders) = env.sender {
                                             sender = Some(format!(
                                                 "{} <{}@{}>",
-                                                senders[0].name.unwrap_or(""),
-                                                senders[0].mailbox.unwrap_or(""),
-                                                senders[0].host.unwrap_or("")
+                                                String::from_utf8_lossy(
+                                                    senders[0].name.unwrap_or(b"")
+                                                ),
+                                                String::from_utf8_lossy(
+                                                    senders[0].mailbox.unwrap_or(b"")
+                                                ),
+                                                String::from_utf8_lossy(
+                                                    senders[0].host.unwrap_or(b"")
+                                                ),
                                             ));
                                         }
                                     }
@@ -153,7 +162,7 @@ impl ResponseAccumulator {
                     uid: uid.unwrap(),
                     mod_seq: mod_seq.unwrap(),
                     flags: flags.unwrap(),
-                    mid: mid,
+                    mid,
                     date: dt,
                     subject,
                     sender,

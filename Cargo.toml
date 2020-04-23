@@ -8,13 +8,13 @@ edition = "2018"
 chrono = { version = "0.4", features = ["serde"] }
 csv = "1"
 email-parser = { path = "../email-parser" }
-futures = { version = "0.3.0-alpha.19", package = "futures-preview" }
+futures = "0.3"
 mbox-reader = "0.2"
-postgres = { version = "0.17.0-alpha.1", features = ["with-chrono-0_4"] }
-postgres-types = { version = "0.1.0-alpha.1", features = ["derive"] }
+postgres = { version = "0.17", features = ["with-chrono-0_4"] }
+postgres-types = { version = "0.1", features = ["derive"] }
 serde = "1"
 serde_derive = "1"
-tokio = "0.2.0-alpha.6"
+tokio = { version = "0.2", features = ["macros"] }
 tokio-imap = { path = "../tokio-imap/tokio-imap" }
-tokio-postgres = "0.5.0-alpha.1"
+tokio-postgres = "0.5"
 toml = "0.4"
