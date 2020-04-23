@@ -3,7 +3,6 @@ use std::env;
 use std::str;
 
 use chrono::{DateTime, FixedOffset};
-use csv;
 use email_parser::Message;
 use postgres::{Client, NoTls};
 use serde_derive::{Deserialize, Serialize};
@@ -42,13 +41,13 @@ fn fuzzy_datetime_parser(orig: &str) -> Option<DateTime<FixedOffset>> {
     s = s.replace(" t0100", " +0100");
     let mut parts = s
         .replace("  ", " ")
-        .split(" ")
+        .split(' ')
         .take(5)
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
     if parts.len() > 3 && parts[3].contains(".") {
         let mut t = parts.remove(3);
-        t = t.replace(".", ":");
+        t = t.replace('.', ":");
         parts.insert(3, t);
     }
     if parts.len() > 4 {
@@ -120,29 +119,29 @@ fn read_meta(fname: &str) -> MetaMap {
                 //panic!("no message-id for message with index {}", meta.seq)
             }
         };
-        map.entry(dt).or_insert(vec![]).push(meta);
+        map.entry(dt).or_insert_with(Vec::new).push(meta);
     }
     map
 }
 
 fn process(map: MetaMap, mut conn: Client) {
-    let mut i = 0;
     let mut matched = 0;
     let stmt = conn
         .prepare("UPDATE messages SET unid = $1, mod_seq = $2 WHERE id = $3")
         .unwrap();
-    for row in &conn
+    for (i, row) in conn
         .query(
             "SELECT id, raw FROM messages WHERE unid IS NULL ORDER BY id ASC",
             &[],
         )
         .unwrap()
+        .iter()
+        .enumerate()
     {
         if i % 10000 == 0 {
             println!("processed {} messages", i);
         }
 
-        i += 1;
         let id: i64 = row.get(0);
         let raw: String = row.get(1);
         let msg = Message::from_slice(raw.as_bytes());

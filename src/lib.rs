@@ -10,17 +10,15 @@ use tokio_imap::client::builder::{
 };
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, Response};
-use toml;
 
+#[derive(Default)]
 pub struct ResponseAccumulator {
     parts: HashMap<u32, (u32, Vec<ResponseData>)>,
 }
 
 impl ResponseAccumulator {
     pub fn new() -> ResponseAccumulator {
-        ResponseAccumulator {
-            parts: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn build_command_attributes(builder: FetchCommandMessages) -> FetchCommandAttributes {
@@ -61,35 +59,31 @@ impl ResponseAccumulator {
                 let mut flags = None;
                 let mut source = None;
                 for rd in entry.1.drain(..) {
-                    match *rd.parsed() {
-                        Response::Fetch(rsp_seq, ref attr_vals) => {
-                            seq = Some(rsp_seq);
-                            for val in attr_vals.iter() {
-                                match *val {
-                                    Uid(u) => {
-                                        uid = Some(u);
-                                    }
-                                    ModSeq(ms) => {
-                                        mod_seq = Some(ms);
-                                    }
-                                    InternalDate(id) => {
-                                        let parsed =
-                                            DateTime::parse_from_str(id, "%d-%b-%Y %H:%M:%S %z");
-                                        dt = Some(parsed.unwrap());
-                                    }
-                                    Flags(ref fs) => {
-                                        flags = Some(
-                                            fs.iter().map(|s| (*s).into()).collect::<Vec<Flag>>(),
-                                        );
-                                    }
-                                    Rfc822(Some(src)) => {
-                                        source = Some(src.to_vec());
-                                    }
-                                    _ => {}
+                    if let Response::Fetch(rsp_seq, attr_vals) = rd.parsed() {
+                        seq = Some(*rsp_seq);
+                        for val in attr_vals.iter() {
+                            match *val {
+                                Uid(u) => {
+                                    uid = Some(u);
                                 }
+                                ModSeq(ms) => {
+                                    mod_seq = Some(ms);
+                                }
+                                InternalDate(id) => {
+                                    let parsed =
+                                        DateTime::parse_from_str(id, "%d-%b-%Y %H:%M:%S %z");
+                                    dt = Some(parsed.unwrap());
+                                }
+                                Flags(ref fs) => {
+                                    flags =
+                                        Some(fs.iter().map(|s| (*s).into()).collect::<Vec<Flag>>());
+                                }
+                                Rfc822(Some(src)) => {
+                                    source = Some(src.to_vec());
+                                }
+                                _ => {}
                             }
                         }
-                        _ => {}
                     };
                 }
                 Some(MessageMeta {

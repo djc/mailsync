@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::env;
 use std::str;
 
-use csv;
 use futures::future::ok;
 use serde_derive::{Deserialize, Serialize};
 use tokio_imap::client::builder::{

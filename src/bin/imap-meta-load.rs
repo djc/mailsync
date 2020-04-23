@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::env;
 use std::str;
 
-use csv;
 use email_parser::Message;
 use postgres::{Client, NoTls};
 use serde_derive::{Deserialize, Serialize};
@@ -27,20 +26,20 @@ fn read_meta(fname: &str) -> MetaMap {
             Some(ref mid) => mid.clone(),
             None => panic!("no message-id for message with index {}", meta.seq),
         };
-        map.entry(mid).or_insert(vec![]).push(meta);
+        map.entry(mid).or_insert_with(Vec::new).push(meta);
     }
     map
 }
 
 fn sender_address(s: &str) -> &str {
-    let start = match s.find("<") {
+    let start = match s.find('<') {
         Some(s) => s,
         None => {
             return s.trim();
         }
     };
     let started = &s[start + 1..];
-    let end = started.find(">").expect("'>' must be present in sender");
+    let end = started.find('>').expect("'>' must be present in sender");
     &started[..end]
 }
 
@@ -90,7 +89,7 @@ fn process(map: MetaMap, mut conn: Client) {
         };
 
         let metas: Vec<&MessageMeta> = metas
-            .into_iter()
+            .iter()
             .filter(|m| match (&m.subject, &subject) {
                 (&Some(ref meta_subj), &Some(ref db_subj)) => {
                     if meta_subj.len() == 998 {
@@ -143,23 +142,26 @@ fn process(map: MetaMap, mut conn: Client) {
         println!("from {:?}", headers.get_first("from"));
         println!("sent to {:?}", headers.get_first("to"));
 
-        if metas.len() == 1 {
-            let meta = metas.get(0).unwrap();
-            match conn.execute(&stmt, &[&(meta.uid as i64), &(meta.mod_seq as i64), &id]) {
-                Ok(num) => println!("updated {} rows", num),
-                Err(e) => println!("update result {:?}", e),
+        match metas.len() {
+            1 => {
+                let meta = metas.get(0).unwrap();
+                match conn.execute(&stmt, &[&(meta.uid as i64), &(meta.mod_seq as i64), &id]) {
+                    Ok(num) => println!("updated {} rows", num),
+                    Err(e) => println!("update result {:?}", e),
+                }
             }
-            continue;
-        } else if metas.len() > 1 {
-            let meta = metas.get(0).unwrap();
-            println!(
-                "multiple matches for {} = {} (subject = {:?})",
-                mid,
-                metas.len(),
-                meta.subject
-            );
-        } else {
-            println!("no matches left for {} (subject = {:?})", mid, subject);
+            i if i > 1 => {
+                let meta = metas.get(0).unwrap();
+                println!(
+                    "multiple matches for {} = {} (subject = {:?})",
+                    mid,
+                    metas.len(),
+                    meta.subject
+                );
+            }
+            _ => {
+                println!("no matches left for {} (subject = {:?})", mid, subject);
+            }
         }
     }
 }

@@ -4,7 +4,6 @@ use std::str;
 
 use chrono::DateTime;
 use email_parser::Message;
-use mbox_reader;
 use postgres::{Client, NoTls};
 
 use mailsync::Config;
@@ -44,8 +43,8 @@ fn process(mbox: mbox_reader::MboxFile, mut conn: Client) {
             None => panic!("first header not found: {:?}", bytes),
         }
 
-        let foo = split.next();
-        let mut rest = foo.unwrap();
+        let parts = split.next();
+        let mut rest = parts.unwrap();
         if rest.starts_with("X-Gmail-Labels:") {
             let mut split = rest.splitn(2, "\r\n");
             let labels = split.next();
@@ -78,11 +77,8 @@ fn process(mbox: mbox_reader::MboxFile, mut conn: Client) {
             None => None as Option<String>,
         };
 
-        match conn.execute(&stmt, &[&dt, &subject, &message_id, &bytes]) {
-            Err(e) => {
-                println!("error for {}: {}", i, e);
-            }
-            _ => {}
+        if let Err(e) = conn.execute(&stmt, &[&dt, &subject, &message_id, &bytes]) {
+            println!("error for {}: {}", i, e);
         }
     }
     println!("DONE {}", i);
