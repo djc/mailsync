@@ -54,32 +54,30 @@ async fn main() {
     let cmd = ResponseAccumulator::build_command_attributes(cmd);
     client
         .call(cmd.build())
-        .try_fold((db, ResponseAccumulator::new()), |(db, acc), rd| {
-            async {
-                let (new, meta_opt) = acc.push(rd);
-                if let Some(meta) = meta_opt {
-                    let msg = Message::from_slice(&meta.raw);
-                    let headers = msg.headers();
-                    eprintln!("Storing message from {} (UID {})", meta.dt, meta.uid);
+        .try_fold((db, ResponseAccumulator::new()), |(db, acc), rd| async {
+            let (new, meta_opt) = acc.push(rd);
+            if let Some(meta) = meta_opt {
+                let msg = Message::from_slice(&meta.raw);
+                let headers = msg.headers();
+                eprintln!("Storing message from {} (UID {})", meta.dt, meta.uid);
 
-                    db.execute(
-                        &istmt,
-                        &[
-                            &(meta.uid as i64),
-                            &(meta.mod_seq as i64),
-                            &meta.dt,
-                            &headers.get_first("subject").map(|s| s.to_string()),
-                            &headers.get_first("message-id").map(|s| s.to_string()),
-                            &meta.raw,
-                            &meta.flags,
-                        ],
-                    )
-                    .await
-                    .unwrap();
-                }
-
-                Ok((db, new))
+                db.execute(
+                    &istmt,
+                    &[
+                        &(meta.uid as i64),
+                        &(meta.mod_seq as i64),
+                        &meta.dt,
+                        &headers.get_first("subject").map(|s| s.to_string()),
+                        &headers.get_first("message-id").map(|s| s.to_string()),
+                        &meta.raw,
+                        &meta.flags,
+                    ],
+                )
+                .await
+                .unwrap();
             }
+
+            Ok((db, new))
         })
         .await
         .unwrap();
