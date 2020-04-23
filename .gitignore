@@ -2,3 +2,4 @@ target
 *.toml
 .idea
 *.csv
+archive
