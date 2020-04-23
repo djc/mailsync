@@ -41,7 +41,7 @@ async fn main() {
             Response::MailboxData(MailboxDatum::Exists(num)) => Some(num),
             _ => None,
         })
-        .nth(0)
+        .next()
         .unwrap();
 
     let (start, end) = (1, exists);
@@ -114,47 +114,38 @@ impl ResponseAccumulator {
                 let mut sender = None;
                 let mut flags = None;
                 for rd in entry.1.drain(..) {
-                    match *rd.parsed() {
-                        Response::Fetch(_, ref attr_vals) => {
-                            for val in attr_vals.iter() {
-                                match *val {
-                                    Uid(u) => {
-                                        uid = Some(u);
-                                    }
-                                    ModSeq(ms) => {
-                                        mod_seq = Some(ms);
-                                    }
-                                    Flags(ref fs) => {
-                                        let list: Vec<&str> = fs.iter().map(|f| *f).collect();
-                                        flags = Some(list.join(" "));
-                                    }
-                                    Envelope(ref env) => {
-                                        mid = env
-                                            .message_id
-                                            .map(|r| String::from_utf8_lossy(r).into());
-                                        dt = env.date.map(|r| String::from_utf8_lossy(r).into());
-                                        subject =
-                                            env.subject.map(|r| String::from_utf8_lossy(r).into());
-                                        if let Some(ref senders) = env.sender {
-                                            sender = Some(format!(
-                                                "{} <{}@{}>",
-                                                String::from_utf8_lossy(
-                                                    senders[0].name.unwrap_or(b"")
-                                                ),
-                                                String::from_utf8_lossy(
-                                                    senders[0].mailbox.unwrap_or(b"")
-                                                ),
-                                                String::from_utf8_lossy(
-                                                    senders[0].host.unwrap_or(b"")
-                                                ),
-                                            ));
-                                        }
-                                    }
-                                    _ => {}
+                    if let Response::Fetch(_, attr_vals) = rd.parsed() {
+                        for val in attr_vals.iter() {
+                            match *val {
+                                Uid(u) => {
+                                    uid = Some(u);
                                 }
+                                ModSeq(ms) => {
+                                    mod_seq = Some(ms);
+                                }
+                                Flags(ref fs) => {
+                                    let list = fs.iter().copied().collect::<Vec<_>>();
+                                    flags = Some(list.join(" "));
+                                }
+                                Envelope(ref env) => {
+                                    mid = env.message_id.map(|r| String::from_utf8_lossy(r).into());
+                                    dt = env.date.map(|r| String::from_utf8_lossy(r).into());
+                                    subject =
+                                        env.subject.map(|r| String::from_utf8_lossy(r).into());
+                                    if let Some(ref senders) = env.sender {
+                                        sender = Some(format!(
+                                            "{} <{}@{}>",
+                                            String::from_utf8_lossy(senders[0].name.unwrap_or(b"")),
+                                            String::from_utf8_lossy(
+                                                senders[0].mailbox.unwrap_or(b"")
+                                            ),
+                                            String::from_utf8_lossy(senders[0].host.unwrap_or(b"")),
+                                        ));
+                                    }
+                                }
+                                _ => {}
                             }
                         }
-                        _ => {}
                     };
                 }
                 Some(MessageMeta {
