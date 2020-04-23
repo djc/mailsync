@@ -90,82 +90,79 @@ impl ResponseAccumulator {
     }
     fn push(mut self, rd: ResponseData) -> (Self, Option<MessageMeta>) {
         use crate::AttributeValue::*;
-        let completed = {
-            let (idx, entry) = match *rd.parsed() {
-                Response::Fetch(idx, ref attr_vals) => {
-                    let mut entry = self.parts.entry(idx).or_insert((0, vec![]));
-                    for val in attr_vals.iter() {
-                        entry.0 += match *val {
-                            Uid(_) | ModSeq(_) | Flags(_) | Envelope(_) => 1,
-                            _ => 0,
-                        };
-                    }
-                    (idx, entry)
-                }
-                _ => return (self, None),
-            };
-            entry.1.push(rd);
-            if entry.0 == self.num_parts {
-                let mut mod_seq = None;
-                let mut uid = None;
-                let mut mid = None;
-                let mut dt = None;
-                let mut subject = None;
-                let mut sender = None;
-                let mut flags = None;
-                for rd in entry.1.drain(..) {
-                    if let Response::Fetch(_, attr_vals) = rd.parsed() {
-                        for val in attr_vals.iter() {
-                            match *val {
-                                Uid(u) => {
-                                    uid = Some(u);
-                                }
-                                ModSeq(ms) => {
-                                    mod_seq = Some(ms);
-                                }
-                                Flags(ref fs) => {
-                                    let list = fs.iter().copied().collect::<Vec<_>>();
-                                    flags = Some(list.join(" "));
-                                }
-                                Envelope(ref env) => {
-                                    mid = env.message_id.map(|r| String::from_utf8_lossy(r).into());
-                                    dt = env.date.map(|r| String::from_utf8_lossy(r).into());
-                                    subject =
-                                        env.subject.map(|r| String::from_utf8_lossy(r).into());
-                                    if let Some(ref senders) = env.sender {
-                                        sender = Some(format!(
-                                            "{} <{}@{}>",
-                                            String::from_utf8_lossy(senders[0].name.unwrap_or(b"")),
-                                            String::from_utf8_lossy(
-                                                senders[0].mailbox.unwrap_or(b"")
-                                            ),
-                                            String::from_utf8_lossy(senders[0].host.unwrap_or(b"")),
-                                        ));
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
+        let (idx, entry) = match *rd.parsed() {
+            Response::Fetch(idx, ref attr_vals) => {
+                let mut entry = self.parts.entry(idx).or_insert((0, vec![]));
+                for val in attr_vals.iter() {
+                    entry.0 += match *val {
+                        Uid(_) | ModSeq(_) | Flags(_) | Envelope(_) => 1,
+                        _ => 0,
                     };
                 }
-                Some(MessageMeta {
-                    seq: idx,
-                    uid: uid.unwrap(),
-                    mod_seq: mod_seq.unwrap(),
-                    flags: flags.unwrap(),
-                    mid,
-                    date: dt,
-                    subject,
-                    sender,
-                })
-            } else {
-                None
+                (idx, entry)
             }
+            _ => return (self, None),
         };
-        if let Some(ref meta) = completed {
-            self.parts.remove(&meta.seq);
+
+        entry.1.push(rd);
+        if entry.0 < self.num_parts {
+            return (self, None);
         }
-        (self, completed)
+
+        let mut mod_seq = None;
+        let mut uid = None;
+        let mut mid = None;
+        let mut dt = None;
+        let mut subject = None;
+        let mut sender = None;
+        let mut flags = None;
+        for rd in entry.1.drain(..) {
+            if let Response::Fetch(_, attr_vals) = rd.parsed() {
+                for val in attr_vals.iter() {
+                    match *val {
+                        Uid(u) => {
+                            uid = Some(u);
+                        }
+                        ModSeq(ms) => {
+                            mod_seq = Some(ms);
+                        }
+                        Flags(ref fs) => {
+                            let list = fs.iter().copied().collect::<Vec<_>>();
+                            flags = Some(list.join(" "));
+                        }
+                        Envelope(ref env) => {
+                            mid = env.message_id.map(|r| String::from_utf8_lossy(r).into());
+                            dt = env.date.map(|r| String::from_utf8_lossy(r).into());
+                            subject = env.subject.map(|r| String::from_utf8_lossy(r).into());
+                            if let Some(ref senders) = env.sender {
+                                sender = Some(format!(
+                                    "{} <{}@{}>",
+                                    String::from_utf8_lossy(senders[0].name.unwrap_or(b"")),
+                                    String::from_utf8_lossy(senders[0].mailbox.unwrap_or(b"")),
+                                    String::from_utf8_lossy(senders[0].host.unwrap_or(b"")),
+                                ));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            };
+        }
+
+        self.parts.remove(&idx);
+        (
+            self,
+            Some(MessageMeta {
+                seq: idx,
+                uid: uid.unwrap(),
+                mod_seq: mod_seq.unwrap(),
+                flags: flags.unwrap(),
+                mid,
+                date: dt,
+                subject,
+                sender,
+            }),
+        )
     }
 }
 
