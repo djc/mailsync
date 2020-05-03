@@ -13,7 +13,7 @@ use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::TlsClient;
 
-use mailsync::Config;
+use mailsync::{Config, Flag};
 
 #[tokio::main]
 async fn main() {
@@ -137,7 +137,7 @@ impl ResponseAccumulator {
         let mut dt = None;
         let mut subject = None;
         let mut sender = None;
-        let mut flags = None;
+        let mut flags = Vec::new();
         for rd in entry.1.drain(..) {
             if let Response::Fetch(_, attr_vals) = rd.parsed() {
                 for val in attr_vals.iter() {
@@ -149,8 +149,7 @@ impl ResponseAccumulator {
                             mod_seq = Some(ms);
                         }
                         Flags(ref fs) => {
-                            let list = fs.iter().copied().collect::<Vec<_>>();
-                            flags = Some(list.join(" "));
+                            flags.extend(fs.iter().filter_map(|f| Flag::from_str(f)));
                         }
                         Envelope(ref env) => {
                             mid = env.message_id.map(|r| String::from_utf8_lossy(r).into());
@@ -178,7 +177,7 @@ impl ResponseAccumulator {
                 seq: idx,
                 uid: uid.unwrap(),
                 mod_seq: mod_seq.unwrap(),
-                flags: flags.unwrap(),
+                flags,
                 mid,
                 date: dt,
                 subject,
@@ -193,7 +192,7 @@ struct MessageMeta {
     seq: u32,
     uid: u32,
     mod_seq: u64,
-    flags: String,
+    flags: Vec<Flag>,
     mid: Option<String>,
     date: Option<String>,
     subject: Option<String>,

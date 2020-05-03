@@ -56,7 +56,7 @@ impl ResponseAccumulator {
                 let mut uid = None;
                 let mut mod_seq = None;
                 let mut dt = None;
-                let mut flags = None;
+                let mut flags = Vec::new();
                 let mut source = None;
                 for rd in entry.1.drain(..) {
                     if let Response::Fetch(rsp_seq, attr_vals) = rd.parsed() {
@@ -75,8 +75,7 @@ impl ResponseAccumulator {
                                     dt = Some(parsed.unwrap());
                                 }
                                 Flags(ref fs) => {
-                                    flags =
-                                        Some(fs.iter().map(|s| (*s).into()).collect::<Vec<Flag>>());
+                                    flags.extend(fs.iter().filter_map(|&f| Flag::from_str(f)));
                                 }
                                 Rfc822(Some(src)) => {
                                     source = Some(src.to_vec());
@@ -91,7 +90,7 @@ impl ResponseAccumulator {
                     uid: uid.unwrap(),
                     mod_seq: mod_seq.unwrap(),
                     dt: dt.unwrap(),
-                    flags: flags.unwrap(),
+                    flags,
                     raw: source.unwrap(),
                 })
             } else {
@@ -129,13 +128,17 @@ pub enum Flag {
     Seen,
 }
 
-impl<'a> From<&'a str> for Flag {
-    fn from(s: &'a str) -> Self {
+impl Flag {
+    pub fn from_str(s: &str) -> Option<Flag> {
         match s {
-            "\\Answered" => Flag::Answered,
-            "\\Flagged" => Flag::Flagged,
-            "\\Seen" => Flag::Seen,
-            _ => panic!("unsupported flag value '{}'", s),
+            "\\Answered" => Some(Flag::Answered),
+            "\\Flagged" => Some(Flag::Flagged),
+            "\\Seen" => Some(Flag::Seen),
+            "Junk" | "$Phishing" | "NonJunk" | "$MDNSent" | "$Forwarded" => None,
+            v => {
+                println!("unknown flag: {}", v);
+                None
+            }
         }
     }
 }
