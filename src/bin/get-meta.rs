@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::str;
 
 use bincode;
+use chrono::{DateTime, FixedOffset};
 use futures::future::ok;
 use serde_derive::{Deserialize, Serialize};
 use sled;
@@ -13,7 +14,7 @@ use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::TlsClient;
 
-use mailsync::{Config, Flag};
+use mailsync::{fuzzy_datetime_parser, Config, Flag};
 
 #[tokio::main]
 async fn main() {
@@ -153,7 +154,16 @@ impl ResponseAccumulator {
                         }
                         Envelope(ref env) => {
                             mid = env.message_id.map(|r| String::from_utf8_lossy(r).into());
-                            dt = env.date.map(|r| String::from_utf8_lossy(r).into());
+                            dt = env.date.and_then(|r| {
+                                fuzzy_datetime_parser(str::from_utf8(r).unwrap())
+                            });
+
+                            if dt.is_none() {
+                                if let Some(dt) = env.date {
+                                    println!("failed to parse date: {}", str::from_utf8(dt).unwrap());
+                                }
+                            }
+
                             subject = env.subject.map(|r| String::from_utf8_lossy(r).into());
                             if let Some(ref senders) = env.sender {
                                 sender = Some(format!(
@@ -179,7 +189,7 @@ impl ResponseAccumulator {
                 mod_seq: mod_seq.unwrap(),
                 flags,
                 mid,
-                date: dt,
+                dt,
                 subject,
                 sender,
             }),
@@ -194,7 +204,7 @@ struct MessageMeta {
     mod_seq: u64,
     flags: Vec<Flag>,
     mid: Option<String>,
-    date: Option<String>,
+    dt: Option<DateTime<FixedOffset>>,
     subject: Option<String>,
     sender: Option<String>,
 }
