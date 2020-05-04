@@ -1,0 +1,21 @@
+[package]
+name = "web"
+version = "0.1.0"
+authors = ["Dirkjan Ochtman <dirkjan@ochtman.nl>"]
+edition = "2018"
+workspace = ".."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+askama = "0.9"
+async-trait = "0.1"
+bincode = "1.2"
+chrono = "0.4"
+err-derive = "0.2"
+hyper = "0.13.2"
+mailsync = { path = "../mailsync" }
+mendes = { version = "0.0.21", features = ["with-hyper", "with-chrono"] }
+serde = { version = "1", features = ["derive"] }
+sled = "0.31"
+tokio = { version = "0.2", features = ["macros"] }

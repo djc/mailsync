@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Inbox</title>
+    <meta charset="utf-8">
+    <style>
+
+      body {
+        text-align: center;
+        font-family: -apple-system, ".SFNSText-Regular", "San Francisco", "Roboto", "Segoe UI", "Helvetica Neue", "Lucida Grande", sans-serif;
+        text-rendering: optimizelegibility;
+        font-size: .875rem;
+        letter-spacing: .2px;
+        line-height: 20px;
+        font-weight: normal;
+        background: #fafafa;
+        color: #333;
+        padding: 0;
+        margin: 0;
+      }
+
+      #title {
+        text-align: center;
+        font-size: 1.8em;
+      }
+
+      #url {
+        font-size: 0.8em;
+      }
+
+      p {
+        margin: 30px;
+        margin-top: 30px;
+      }
+
+      p#local, p#ref {
+        display: none;
+        text-align: center;
+      }
+
+      span.label {
+        display: block;
+        color: #aaa;
+        width: 100%;
+        font-weight: normal;
+        font-size: 0.7em;
+        margin: 10px;
+      }
+
+      section {
+        clear: both;
+        display: block;
+        font-weight: normal;
+        font-size: .55em;
+        margin: 4em auto 0em auto;
+        width: 450px;
+      }
+
+      section[hidden] {
+        display: none;
+      }
+
+      form {
+        text-align: left;
+      }
+
+      input {
+        font: inherit;
+        padding: .3em .5em;
+      }
+
+      label,
+      fieldset,
+      input[type="submit"] {
+        display: block;
+        margin: 1em 0 0;
+      }
+
+      fieldset {
+        border: none;
+        padding: 0;
+      }
+
+      fieldset > label {
+        display: inline;
+        padding-right: .7em;
+      }
+
+      label.name, legend.name {
+        padding-left: 1px;
+        padding-bottom: 5px;
+      }
+
+      .optional {
+        display: none;
+      }
+
+      footer p {
+        font-weight: normal;
+        font-size: 0.9em;
+        color: #999;
+        margin-top: 30px;
+        text-align: center;
+      }
+
+      a {
+        text-decoration: none;
+        color: #006;
+      }
+
+      footer a {
+        color: #99f;
+      }
+
+      a.edit {
+        cursor: pointer;
+      }
+
+      a:hover, a:active {
+        color: #f99;
+      }
+
+      span.hint {
+        color: #aaa;
+      }
+
+      p.narrow {
+        margin: 0;
+        width: 450px;
+      }
+
+      table#threads {
+        border-spacing: 0;
+        margin: 0;
+        width: 90%;
+      }
+
+      table tr {
+        cursor: pointer;
+      }
+
+      table tr:hover {
+        background: #9ce !important;
+      }
+
+      tr.unread td {
+        font-weight: bold;
+      }
+
+      table td, table th {
+        padding: 2px 4px 3px 4px;
+        border: 0;
+        border-bottom: 1px solid #eee;
+      }
+
+      table td:nth-child(1) {
+        text-align: left;
+        width: 168px;
+      }
+
+      table td:nth-child(2) {
+        text-align: left;
+      }
+
+      table td:nth-child(3) {
+        text-align: right;
+        width: 72px;
+      }
+
+    </style>
+  </head>
+  <body>
+      <table id="threads">
+        <tbody>
+        {% for msg in messages %}
+        <tr {% if msg.unread() %} class="unread"{% endif %}>
+          <td>{{ msg.sender_name() }}</td>
+          <td>{{ msg.subject() }}</td>
+          <td>{{ msg.date() }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+  </body>
+</html>
