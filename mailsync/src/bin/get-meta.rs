@@ -23,7 +23,6 @@ async fn main() {
 
     let db = sled::open("mail.sled").unwrap();
     let tree = db.open_tree("meta").unwrap();
-    let mut batch = sled::Batch::default();
     let mut wrote = (0usize, 0usize);
 
     let (_, mut client) = TlsClient::connect(&config.imap.server).await.unwrap();
@@ -69,11 +68,11 @@ async fn main() {
                     println!("store metadata for index {}", meta.seq);
                 }
 
-                let key = meta.uid.to_le_bytes();
+                let key = meta.uid.to_be_bytes();
                 let serialized = bincode::serialize(&meta).unwrap();
                 wrote.0 += 1;
                 wrote.1 += serialized.len();
-                batch.insert(&key, serialized);
+                tree.insert(&key, serialized).unwrap();
             }
             ok(new)
         })
@@ -86,11 +85,7 @@ async fn main() {
         .await
         .unwrap();
 
-    println!(
-        "commit transaction ({} items, total size {})...",
-        wrote.0, wrote.1
-    );
-    tree.apply_batch(batch).unwrap();
+    println!("wrote {} items, total size {}", wrote.0, wrote.1);
 }
 
 #[derive(Debug, StructOpt)]
@@ -154,13 +149,16 @@ impl ResponseAccumulator {
                         }
                         Envelope(ref env) => {
                             mid = env.message_id.map(|r| String::from_utf8_lossy(r).into());
-                            dt = env.date.and_then(|r| {
-                                fuzzy_datetime_parser(str::from_utf8(r).unwrap())
-                            });
+                            dt = env
+                                .date
+                                .and_then(|r| fuzzy_datetime_parser(str::from_utf8(r).unwrap()));
 
                             if dt.is_none() {
                                 if let Some(dt) = env.date {
-                                    println!("failed to parse date: {}", str::from_utf8(dt).unwrap());
+                                    println!(
+                                        "failed to parse date: {}",
+                                        str::from_utf8(dt).unwrap()
+                                    );
                                 }
                             }
 
