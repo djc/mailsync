@@ -201,7 +201,7 @@ pub struct MessageMeta {
     pub raw: Vec<u8>,
 }
 
-#[derive(Debug, Deserialize, FromSql, Serialize, ToSql)]
+#[derive(Debug, Deserialize, FromSql, PartialEq, Serialize, ToSql)]
 #[postgres(name = "flags")]
 pub enum Flag {
     #[postgres(name = "\\Answered")]
