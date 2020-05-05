@@ -2,7 +2,7 @@ use std::env;
 
 use email_parser::Message;
 use futures::future::FutureExt;
-use tokio_imap::client::builder::{CommandBuilder, FetchBuilderMessages, FetchBuilderModifiers};
+use tokio_imap::client::builder::CommandBuilder;
 use tokio_postgres::NoTls;
 
 use mailsync::{Config, ResponseAccumulator};
@@ -50,10 +50,10 @@ async fn main() {
         .unwrap();
 
     eprintln!("Starting from UID {}...", seen_seq + 1);
-    let cmd = CommandBuilder::uid_fetch().all_after((seen_seq + 1) as u32);
+    let cmd = CommandBuilder::uid_fetch().range_from((seen_seq + 1) as u32..);
     let cmd = ResponseAccumulator::build_command_attributes(cmd);
     client
-        .call(cmd.build())
+        .call(cmd)
         .try_fold((db, ResponseAccumulator::new()), |(db, acc), rd| async {
             let (new, meta_opt) = acc.push(rd);
             if let Some(meta) = meta_opt {

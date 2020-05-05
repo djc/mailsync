@@ -5,9 +5,7 @@ use std::io;
 use chrono::{DateTime, FixedOffset};
 use postgres_types::{FromSql, ToSql};
 use serde_derive::{Deserialize, Serialize};
-use tokio_imap::client::builder::{
-    FetchBuilderAttributes, FetchCommandAttributes, FetchCommandMessages,
-};
+use tokio_imap::client::builder::{fetch, FetchCommand};
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, Response};
 
@@ -21,7 +19,9 @@ impl ResponseAccumulator {
         Self::default()
     }
 
-    pub fn build_command_attributes(builder: FetchCommandMessages) -> FetchCommandAttributes {
+    pub fn build_command_attributes(
+        builder: FetchCommand<fetch::Messages>,
+    ) -> FetchCommand<fetch::Attributes> {
         builder
             .attr(Attribute::Uid)
             .attr(Attribute::ModSeq)

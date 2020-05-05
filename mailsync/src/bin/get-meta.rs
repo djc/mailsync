@@ -7,9 +7,7 @@ use futures::future::ok;
 use serde_derive::{Deserialize, Serialize};
 use sled;
 use structopt::StructOpt;
-use tokio_imap::client::builder::{
-    CommandBuilder, FetchBuilderAttributes, FetchBuilderMessages, FetchBuilderModifiers,
-};
+use tokio_imap::client::builder::CommandBuilder;
 use tokio_imap::proto::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
 use tokio_imap::TlsClient;
@@ -49,15 +47,13 @@ async fn main() {
         .next()
         .unwrap();
 
-    let (start, end) = (1, exists);
-    println!("fetch metadata for {}:{}...", start, end);
+    println!("{} messages found, fetching metadata...", exists);
     let cmd = CommandBuilder::fetch()
-        .range(start, end)
+        .range_from(1..)
         .attr(Attribute::Uid)
         .attr(Attribute::ModSeq)
         .attr(Attribute::Flags)
-        .attr(Attribute::Envelope)
-        .build();
+        .attr(Attribute::Envelope);
 
     let _ = client
         .call(cmd)
