@@ -1,6 +1,6 @@
 use askama::Template;
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use err_derive::Error;
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::Body;
@@ -71,7 +71,18 @@ impl MessageMeta {
 
     fn date(&self) -> String {
         match &self.dt {
-            Some(dt) => format!("{}", dt),
+            Some(dt) => {
+                let dt = dt.with_timezone(&Utc);
+                let now = Utc::now();
+                let diff = now - dt;
+                if diff.num_hours() < 24 {
+                    format!("{}", dt.format("%H:%M"))
+                } else if diff.num_weeks() < 26 {
+                    format!("{}", dt.format("%b %e"))
+                } else {
+                    format!("{}", dt.format("%F"))
+                }
+            },
             None => "(no date)".into(),
         }
     }
