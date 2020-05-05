@@ -82,7 +82,7 @@ impl MessageMeta {
                 } else {
                     format!("{}", dt.format("%F"))
                 }
-            },
+            }
             None => "(no date)".into(),
         }
     }
