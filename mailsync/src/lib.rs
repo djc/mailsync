@@ -5,8 +5,8 @@ use std::io;
 use chrono::{DateTime, FixedOffset};
 use postgres_types::{FromSql, ToSql};
 use serde_derive::{Deserialize, Serialize};
-use tokio_imap::client::builder::{fetch, FetchCommand};
-use tokio_imap::proto::ResponseData;
+use tokio_imap::builders::{fetch, FetchCommand};
+use tokio_imap::ResponseData;
 use tokio_imap::types::{Attribute, AttributeValue, Response};
 
 #[derive(Default)]

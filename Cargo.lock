@@ -601,7 +601,7 @@ dependencies = [
 [[package]]
 name = "imap-proto"
 version = "0.10.2"
-source = "git+https://github.com/djc/tokio-imap?rev=e0bbbfb9551e523cc5a66a8061a02ab8044870f7#e0bbbfb9551e523cc5a66a8061a02ab8044870f7"
+source = "git+https://github.com/djc/tokio-imap?rev=7398b339077f2edeaaa3e063fd80cce04fc70127#7398b339077f2edeaaa3e063fd80cce04fc70127"
 dependencies = [
  "nom",
 ]
@@ -1438,12 +1438,13 @@ dependencies = [
 [[package]]
 name = "tokio-imap"
 version = "0.5.0"
-source = "git+https://github.com/djc/tokio-imap?rev=e0bbbfb9551e523cc5a66a8061a02ab8044870f7#e0bbbfb9551e523cc5a66a8061a02ab8044870f7"
+source = "git+https://github.com/djc/tokio-imap?rev=7398b339077f2edeaaa3e063fd80cce04fc70127#7398b339077f2edeaaa3e063fd80cce04fc70127"
 dependencies = [
  "bytes",
  "futures",
  "imap-proto",
  "nom",
+ "pin-project",
  "tokio",
  "tokio-rustls",
  "tokio-util",

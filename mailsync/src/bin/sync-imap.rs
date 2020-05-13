@@ -2,7 +2,8 @@ use std::env;
 
 use email_parser::Message;
 use futures::future::FutureExt;
-use tokio_imap::client::builder::CommandBuilder;
+use futures::stream::TryStreamExt;
+use tokio_imap::builders::CommandBuilder;
 use tokio_postgres::NoTls;
 
 use mailsync::{Config, ResponseAccumulator};
@@ -25,7 +26,7 @@ async fn main() {
             &config.imap.account,
             &config.imap.password,
         ))
-        .try_collect()
+        .try_collect::<Vec<_>>()
         .await
         .unwrap();
 
@@ -37,7 +38,7 @@ async fn main() {
 
     let _ = client
         .call(CommandBuilder::examine("[Gmail]/All Mail"))
-        .try_collect()
+        .try_collect::<Vec<_>>()
         .await
         .unwrap();
 
@@ -84,7 +85,7 @@ async fn main() {
 
     let _ = client
         .call(CommandBuilder::close())
-        .try_collect()
+        .try_collect::<Vec<_>>()
         .await
         .unwrap();
 }

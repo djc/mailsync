@@ -4,13 +4,13 @@ use std::str;
 use bincode;
 use chrono::{DateTime, FixedOffset};
 use futures::future::ok;
+use futures::stream::TryStreamExt;
 use serde_derive::{Deserialize, Serialize};
 use sled;
 use structopt::StructOpt;
-use tokio_imap::client::builder::CommandBuilder;
-use tokio_imap::proto::ResponseData;
+use tokio_imap::builders::CommandBuilder;
 use tokio_imap::types::{Attribute, AttributeValue, MailboxDatum, Response};
-use tokio_imap::TlsClient;
+use tokio_imap::{ResponseData, TlsClient};
 
 use mailsync::{fuzzy_datetime_parser, Config, Flag};
 
@@ -29,13 +29,13 @@ async fn main() {
             &config.imap.account,
             &config.imap.password,
         ))
-        .try_collect()
+        .try_collect::<Vec<_>>()
         .await
         .unwrap();
 
     let msgs = client
-        .call(CommandBuilder::examine("[Gmail]/All Mail"))
-        .try_collect()
+        .call(CommandBuilder::examine("INBOX").cond_store())
+        .try_collect::<Vec<_>>()
         .await
         .unwrap();
     let exists = msgs
@@ -77,7 +77,7 @@ async fn main() {
 
     let _ = client
         .call(CommandBuilder::close())
-        .try_collect()
+        .try_collect::<Vec<_>>()
         .await
         .unwrap();
 
