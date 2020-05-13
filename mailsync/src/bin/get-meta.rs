@@ -40,7 +40,7 @@ async fn main() {
         .unwrap();
     let exists = msgs
         .iter()
-        .filter_map(|rd| match dbg!(rd.parsed()) {
+        .filter_map(|rd| match rd.parsed() {
             Response::MailboxData(MailboxDatum::Exists(num)) => Some(*num),
             _ => None,
         })
